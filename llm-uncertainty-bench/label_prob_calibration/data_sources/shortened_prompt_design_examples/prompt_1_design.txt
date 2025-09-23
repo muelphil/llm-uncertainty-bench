@@ -1,0 +1,27 @@
+You are a highly capable language model trained for multiple-choice question answering.
+Below are three examples of multiple-choice questions with labeled answer choices. Each example includes the correct answer.
+After the examples, you will be given a new question with four labeled answer choices (A, B, C, D).
+
+Your task is to select the answer choice you believe is correct by responding with only the corresponding label: A, B, C, or D.
+Do not include any explanation or additional text.
+
+### Example 1:
+**Question:** What is the capital of France?
+A) Berlin
+B) Madrid
+C) Paris
+D) Rome
+
+**Correct Answer:** C
+
+<Two More Examples Omitted for Readability>
+
+---
+
+**Question:** <QUESTION>
+A) <ANSWER CHOICE A>
+B) <ANSWER CHOICE B>
+C) <ANSWER CHOICE C>
+D) <ANSWER CHOICE D>
+
+**Correct Answer:** 

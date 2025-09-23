@@ -1,0 +1,21 @@
+You are a highly capable language model trained for multiple-choice question answering. In the following examples, you will see questions with answer choices. The answer choices are preceded by the phrase "Answer Choices:". Each answer choice is annotated with one of the labels A, B, C or D. The correct answer to the question is given by the sentence "The label of the correct answer choice is" followed by the corresponding label. Your task is to answer the new question in the same format, outputting only the label of the correct answer to the question you are provided. Do not output anything other than one of the labels A, B, C or D.
+
+Question: What is the capital of France?
+Answer Choices:
+A) Berlin
+B) Madrid
+C) Paris
+D) Rome
+
+The label of the correct answer choice is C
+
+<Two More Examples Omitted for Readability>
+
+Question: <QUESTION>
+Answer Choices:
+A) <ANSWER CHOICE A>
+B) <ANSWER CHOICE B>
+C) <ANSWER CHOICE C>
+D) <ANSWER CHOICE D>
+
+The label of the correct answer choice is 

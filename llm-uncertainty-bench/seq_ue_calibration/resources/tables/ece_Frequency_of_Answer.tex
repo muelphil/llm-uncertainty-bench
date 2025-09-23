@@ -1,0 +1,21 @@
+\begin{center}
+  \footnotesize
+  \centering
+  \makebox[\textwidth][c]{%
+    \begin{tabular}{l c c c c c c c c c c c c c}
+      \toprule
+      Dataset & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-20b}} & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-120b}} & \parbox[t]{0mm}{\rotatebox{60}{Ministral-8B-Instruct-2410}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Nemo-Instruct-2407}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Small-3.2-24B-Instruct-2506}} & \parbox[t]{0mm}{\rotatebox{60}{Magistral-Small-2507}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-3.3-70B-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-4-Scout-17B-16E-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Instruct-2507}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Thinking-2507}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Llama-70B}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Qwen-32B}} & \parbox[t]{0mm}{\rotatebox{60}{gemma-3-27b-it}} \\
+      \midrule
+      MMLU & 0.0172 & 0.0187 & 0.0587 & 0.0635 & 0.0240 & 0.0206 & 0.0401 & 0.0336 & 0.0198 & 0.0232 & 0.4230 & 0.1825 & 0.0623 \\
+      ARC Easy & 0.0067 & 0.0064 & 0.0246 & 0.0219 & 0.0091 & 0.0070 & 0.0120 & 0.0076 & 0.0106 & 0.0078 & 0.0726 & 0.0491 & 0.0171 \\
+      ARC Challenge & 0.0078 & 0.0065 & 0.0197 & 0.0348 & 0.0181 & 0.0106 & 0.0199 & 0.0188 & 0.0200 & 0.0163 & 0.1332 & 0.0411 & 0.0413 \\
+      SciQ & 0.0187 & 0.0152 & 0.0217 & 0.0193 & 0.0201 & 0.0156 & 0.0145 & 0.0138 & 0.0231 & 0.0166 & 0.0318 & 0.0579 & 0.0371 \\
+      GPQA & 0.0664 & 0.0729 & 0.2100 & 0.1900 & 0.1508 & 0.1102 & 0.1846 & 0.1706 & 0.1156 & 0.3957 & 0.6773 & 0.6547 & 0.2169 \\
+      GSM8K & 0.0341 & 0.0437 & 0.0288 & 0.0640 & 0.0338 & 0.0422 & 0.0248 & 0.0313 & 0.0380 & 0.0788 & 0.0518 & 0.0516 & 0.0474 \\
+      SVamp & 0.0343 & 0.0278 & 0.0319 & 0.0325 & 0.0394 & 0.0268 & 0.0275 & 0.0327 & 0.0298 & 0.1777 & 0.0475 & 0.1075 & 0.0318 \\
+      SciBench & 0.1587 & 0.1463 & 0.0837 & 0.0891 & 0.1269 & 0.0955 & 0.1511 & 0.1643 & 0.1865 & 0.4269 & 0.4759 & 0.2796 & 0.1231 \\
+      \bottomrule
+    \end{tabular}%
+  }
+  \captionof{table}[ECE by Model and Dataset for Frequency of Answer]{ECE by Model and Dataset for Frequency of Answer}
+\end{center}

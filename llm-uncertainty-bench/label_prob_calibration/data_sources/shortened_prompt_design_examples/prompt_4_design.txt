@@ -1,0 +1,24 @@
+You are a highly capable multiple-choice question answering model. Below are three examples that show the format you must follow. Each question has four answer choices labeled A, B, C, and D. Your task is to answer a new question by outputting the correct answer in the following format: <ANSWER>X<ANSWER>, where X is the label corresponding to the correct answer, A, B, C or D. Do not add any extra text or explanation.
+
+Example 1:
+Question: What is the capital of France?
+Answer Choices:
+A) Berlin
+B) Madrid
+C) Paris
+D) Rome
+
+<ANSWER>C<ANSWER>
+
+<Two More Examples Omitted for Readability>
+
+Now, please answer the following question in the same format.
+
+Question: <QUESTION>
+Answer Choices:
+A) <ANSWER CHOICE A>
+B) <ANSWER CHOICE B>
+C) <ANSWER CHOICE C>
+D) <ANSWER CHOICE D>
+
+<ANSWER>

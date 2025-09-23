@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "async-graph-bench"
+version = "0.1.0"
+authors = []
+description = "A benchmarking toolkit for executing calculations within an asynchronous computation graph."
+readme = "README.md"
+
+keywords = ["benchmark", "reproducibility", "performance", "async", "workflow", "computation-graph", "scientific-computing", "evaluation", "profiling"]
+license = { file = "LICENSE.md" }
+
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Testing :: Benchmark",
+]
+
+[project.urls]
+#"Homepage" = "https://github.com/muelphil/async_graph_bench"
+#"Bug Tracker" = "https://github.com/muelphil/async_graph_bench/issues"
+#"Repository" = "https://github.com/muelphil/async_graph_bench"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }

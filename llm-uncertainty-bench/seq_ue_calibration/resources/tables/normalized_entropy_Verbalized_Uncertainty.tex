@@ -1,0 +1,21 @@
+\begin{center}
+  \footnotesize
+  \centering
+  \makebox[\textwidth][c]{%
+    \begin{tabular}{l c c c c c c c c c c c c c}
+      \toprule
+      Dataset & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-20b}} & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-120b}} & \parbox[t]{0mm}{\rotatebox{60}{Ministral-8B-Instruct-2410}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Nemo-Instruct-2407}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Small-3.2-24B-Instruct-2506}} & \parbox[t]{0mm}{\rotatebox{60}{Magistral-Small-2507}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-3.3-70B-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-4-Scout-17B-16E-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Instruct-2507}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Thinking-2507}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Llama-70B}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Qwen-32B}} & \parbox[t]{0mm}{\rotatebox{60}{gemma-3-27b-it}} \\
+      \midrule
+      MMLU & 0.2586 & 0.3955 & 0.5628 & 0.5390 & 0.4438 & 0.4360 & 0.5025 & 0.2401 & 0.1180 & 0.1202 & 0.5411 & 0.5487 & 0.6322 \\
+      ARC Easy & 0.2720 & 0.3768 & 0.6017 & 0.5654 & 0.4700 & 0.4305 & 0.5400 & 0.3381 & 0.1458 & 0.0717 & 0.4091 & 0.5395 & 0.7096 \\
+      ARC Challenge & 0.3487 & 0.4626 & 0.6401 & 0.5962 & 0.5227 & 0.4905 & 0.5570 & 0.4225 & 0.1819 & 0.0952 & 0.5246 & 0.5721 & 0.7242 \\
+      SciQ & 0.2133 & 0.3610 & 0.5453 & 0.4732 & 0.4778 & 0.4499 & 0.5432 & 0.2465 & 0.1049 & 0.0827 & 0.3465 & 0.5364 & 0.6925 \\
+      GPQA & 0.7480 & 0.7634 & 0.6960 & 0.6725 & 0.6394 & 0.6215 & 0.7459 & 0.5435 & 0.5019 & 0.4535 & 0.5396 & 0.5476 & 0.7516 \\
+      GSM8K & 0.2438 & 0.3633 & 0.1398 & 0.3091 & 0.1024 & 0.2674 & 0.0254 & 0.0373 & 0.3621 & 0.0702 & 0.3014 & 0.2934 & 0.0463 \\
+      SVamp & 0.2296 & 0.3243 & 0.0907 & 0.2866 & 0.1184 & 0.2077 & 0.0777 & 0.0701 & 0.4621 & 0.0510 & 0.2251 & 0.2147 & 0.1016 \\
+      SciBench & 0.4431 & 0.6646 & 0.5026 & 0.2303 & 0.3357 & 0.4193 & 0.3396 & 0.3806 & 0.4548 & 0.3277 & 0.5482 & 0.5236 & 0.5777 \\
+      \bottomrule
+    \end{tabular}%
+  }
+  \captionof{table}[Normalized Entropy of Bucket Counts by Model and Dataset for Verbalized Uncertainty]{Normalized Entropy of Bucket Counts by Model and Dataset for Verbalized Uncertainty}
+\end{center}

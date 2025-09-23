@@ -1,0 +1,27 @@
+format: jb-book
+root: index
+
+chapters:
+  - file: installation
+  - file: overview
+  - file: data_source
+  - file: nodes
+    sections:
+      - file: nodes/data_sources
+      - file: nodes/nodes
+      - file: nodes/node_configuration
+      - file: nodes/sampling
+  - file: manager
+  - file: data_stores
+  - file: resources
+  - file: helpers
+  - file: future_work
+  - file: api
+    sections:
+      - file: api/benchmarkmanager
+      - file: api/datasource
+      - file: api/datastore
+      - file: api/model
+      - file: api/nodeconfig
+      - file: api/samplingconfig
+      - file: api/serializer

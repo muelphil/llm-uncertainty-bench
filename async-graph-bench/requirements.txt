@@ -1,0 +1,12 @@
+aiohttp==3.11.7
+async_graph_data_flow==1.6.0
+bitarray==3.3.0
+diskcache==5.6.3
+graphviz==0.20.3
+msgpack_python==0.5.6
+numpy>=1.26.4
+pandas==2.3.2
+tqdm==4.67.1
+zstd==1.5.6.2
+aioprocessing
+cachetools==5.3.2

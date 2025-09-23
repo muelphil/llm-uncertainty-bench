@@ -1,0 +1,17 @@
+Question: What is the capital of France?
+A) Berlin
+B) Madrid
+C) Paris
+D) Rome
+
+The correct answer is C
+
+<Two More Examples Omitted for Readability>
+
+Question: <QUESTION>
+A) <ANSWER CHOICE A>
+B) <ANSWER CHOICE B>
+C) <ANSWER CHOICE C>
+D) <ANSWER CHOICE D>
+
+The correct answer is 
