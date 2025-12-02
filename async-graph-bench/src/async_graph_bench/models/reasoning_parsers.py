@@ -1,19 +1,6 @@
-# reasoning_patterns = {
-#     "mistral" : {
-#         "start":  [34],
-#         "end": [35]
-#     },
-#     "deepseek" : {
-#         "start":  ['<think>'],
-#         "end": ['</think>', '\n\n']
-#     },
-#     "mistral" : {
-#         "start":  [34],
-#         "end": ['<|end|>', '<|start|>', 'assistant', '<|channel|>', 'final', '<|message|>']
-#     },
-# }
-
 from functools import partial
+
+
 def parse_gpt_oss_reasoning(tokens):
     """
     Parse gpt-oss response tokens into reasoning spans and a final message span.
@@ -21,7 +8,7 @@ def parse_gpt_oss_reasoning(tokens):
     Returns:
         {
             "reasoning": [(start_idx, end_idx, channel_name), ...],
-            "message": (start_idx, end_idx) or None
+            "message": (start_idx, end_idx)
         }
     """
     result = {"reasoning": [], "message": (len(tokens), len(tokens))}
@@ -36,7 +23,24 @@ def parse_gpt_oss_reasoning(tokens):
                 result["reasoning"].append((start_idx, end_idx, current_channel))
         current_channel, start_idx = None, None
 
+    # ------------------------------------------------------------
+    # detect leading orphan tokens (reasoning without channel)
+    # ------------------------------------------------------------
     i = 0
+    if tokens and tokens[0] not in (
+        "<|channel|>", "<|message|>", "<|end|>", "<|return|>", "<|start|>"
+    ):
+        # Scan until the first structural tag
+        start = 0
+        while i < len(tokens) and tokens[i] not in (
+            "<|channel|>", "<|message|>", "<|end|>", "<|return|>", "<|start|>"
+        ):
+            i += 1
+
+        # Treat as analysis reasoning
+        result["reasoning"].append((start, i, "analysis"))
+
+    # Continue normal parsing from `i`
     while i < len(tokens):
         tok = tokens[i]
         if tok == "<|channel|>":
@@ -53,8 +57,9 @@ def parse_gpt_oss_reasoning(tokens):
         else:
             i += 1
 
-    flush(len(tokens))  # catch any truncated message
+    flush(len(tokens))
     return result
+
 
 def find_subarray(tokens, sub, start=0):
     """Find the first index of subarray `sub` in `tokens` starting at `start`."""
@@ -100,34 +105,55 @@ def find_subarray_backwards(tokens, sub, start=0, end=None):
             return i
     return -1
 
+
 def parse_reasoning(tokens, start_pattern, end_pattern):
     i = 0
     reasoning = []
     message_start = 0
+    found_end = False
+
     while True:
-        end_idx = find_subarray(tokens, ['</think>', '\n\n'], i)
+        end_idx = find_subarray(tokens, end_pattern, i)
+
         if end_idx != -1:
-            start_idx = find_subarray_backwards(tokens, ['<think>'], i, end_idx)
+            found_end = True
+            start_idx = find_subarray_backwards(tokens, start_pattern, i, end_idx)
             if start_idx == -1:
                 start_idx = i
             else:
                 start_idx += len(start_pattern)
-            i = end_idx + len(end_pattern)
+
             reasoning.append((start_idx, end_idx, "thinking"))
+            i = end_idx + len(end_pattern)
+
         else:
-            message_start = reasoning[-1][1] + len(end_pattern) if len(reasoning) else 0
+            # NEW LOGIC
+            if not found_end:
+                # entire sequence → reasoning
+                reasoning.append((0, len(tokens), "thinking"))
+                message_start = len(tokens)
+            else:
+                # message starts after last reasoning segment
+                message_start = reasoning[-1][1] + len(end_pattern)
             break
+
     return {"reasoning": reasoning, "message": (message_start, len(tokens))}
 
 
 parse_deepseek_reasoning = partial(
     parse_reasoning,
     start_pattern=["<think>"],
-    end_pattern=["</think>", "\n\n"],
+    end_pattern=["</think>"],
 )
 
 parse_mistral_reasoning = partial(
     parse_reasoning,
     start_pattern=[34],
     end_pattern=[35],
+)
+
+parse_qwen_reasoning = partial(
+    parse_reasoning,
+    start_pattern=["<think>"],                 # no start tag
+    end_pattern=["</think>"],         # Qwen end tag
 )

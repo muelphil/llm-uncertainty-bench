@@ -153,9 +153,21 @@ Correct answer:
 """
 
 
+def sanitize_value(v):
+    v = (v.replace('<|eot_id|>', '')
+         .replace("<|im_end|>","")
+         .replace('<｜end of sentence｜>', '')
+         .replace('\n', ' ')).strip()
+    if len(v) >= 80:
+        # we are only interested in the final result. Even if unwanted, the extraction of the final numerical result will produce answers that have an introductory sentence.
+        return "[...] " + v[-80:]
+    return v
+
+
 def format_clustering_prompt(values: List[str], unit: str) -> str:
     unit_clause = f" (given in {unit})" if unit and unit.strip() else " (values without unit)"
-    values_as_dict = [{"index": i, "value": item.replace('<|eot_id|>', '')} for i, item in enumerate(values)]
+    values_as_dict = [{"index": i, "value": sanitize_value(item)} for
+                      i, item in enumerate(values)]
     values_as_json = json.dumps(values_as_dict, indent=2)
     return clustering_prompt.format(unit_clause=unit_clause, values=values_as_json)
 
@@ -233,9 +245,10 @@ def cluster_freq_list(cluster_ids: List[int]) -> List[float]:
 
 
 class SciBenchAnswerFrequency:
-    dependencies = ["sampled_conclusion_texts", "correct_answer", "unit", "sampled_assistant_tokens_decoded", "sampled_reasoning_tokens_decoded"]
-    stats = ["cluster_id", "frequency_of_answer", "correct_cluster_id", "conclusion_texts_array", "is_correct",
-             "simplified_values", "answer_token_len", "reasoning_token_len"]
+    requires = ["sampled_conclusion_texts", "correct_answer", "unit", "sampled_assistant_tokens_decoded",
+                "sampled_reasoning_tokens_decoded", "finish_reasons", "finish_reasons_post"]
+    provides = ["cluster_id", "frequency_of_answer", "correct_cluster_id", "conclusion_texts_array", "is_correct",
+                "simplified_values", "answer_token_len", "reasoning_token_len", "finish_reasons", "finish_reasons_post"]
     spread = True
 
     def __init__(self, sampling_n: int):
@@ -293,7 +306,7 @@ class SciBenchAnswerFrequency:
             for v, c, ca, u in zip(simplified_values, clusters, correct, unit)
         ]
 
-        params2 = GenerationParameters(max_tokens=400, logprobs=0, temperature=0.0,
+        params2 = GenerationParameters(max_tokens=512, logprobs=0, temperature=0.0,
                                        response_format={"type": "regex", "regex": "^(?:\\d{1,2}|NONE)$"})
         resp2 = await model.query(correct_msgs, generation_params=params2)
         msgs2 = resp2.get_assistant_messages()
@@ -312,5 +325,7 @@ class SciBenchAnswerFrequency:
             "is_correct": is_correct,
             "answer_token_len": [[len(t) for t in sample] for sample in stats["sampled_assistant_tokens_decoded"]],
             "reasoning_token_len": [[len(t) for t in sample] for sample in stats["sampled_reasoning_tokens_decoded"]],
-            "simplified_values": simplified_values
+            "simplified_values": simplified_values,
+            "finish_reasons": stats["finish_reasons"],
+            "finish_reasons_post": stats["finish_reasons_post"]
         }

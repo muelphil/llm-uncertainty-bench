@@ -1,35 +1,32 @@
 import argparse
+import asyncio
 import gc
+import logging
 import os
 from functools import partial
-from importlib.metadata import version
-from async_graph_bench import DiskCacheStore, NodeConfig, BenchmarkManager, visualize_graph, temporary_env, \
-    CSVDataStore, ResourcePool
-import torch
 
-import logging
-from tqdm import tqdm
-import time
-from models import MODELS, DEFAULTS
+from async_graph_bench import DiskCacheStore, NodeConfig, BenchmarkManager, CSVDataStore
+
 from benchmark_datasets import datasets
+from builders import build_model_from_config
 from data_sources import get_prompt_1, get_prompt_2, get_prompt_3, get_prompt_4
-from nodes import LabelProbExtractor, MultipleChoiceLabelProbGenerator
+from models import MODELS, DEFAULTS
+from nodes import LabelProbExtractor, MultipleChoiceLabelProbGenerator, MultipleChoiceLabelProbGeneratorMagistral
 
 NodeConfig.base_config = {"queue_size": 100, "prop_name": "estimations"}
 
 
-class TqdmLoggingHandler(logging.Handler):
-    def emit(self, record):
-        # Format the record and write it using tqdm.write
-        msg = self.format(record)
-        tqdm.write(msg)
+def make_header(t):
+    s = "\033[1;96m";
+    e = "\033[0m"
+    w = len(t) + 4
+    return f"{s}╔{'═' * w}╗\n║  {t}  ║\n╚{'═' * w}╝{e}"
 
 
 logging.basicConfig(
     level=logging.INFO,  # Set the logging level
     format="%(asctime)s [%(name)s] %(message)s",  # Include the logger name in brackets
     datefmt="%H:%M:%S",  # Time format in HH:MM:SS
-    handlers=[TqdmLoggingHandler()]
 )
 
 prompts_dict = {
@@ -39,11 +36,14 @@ prompts_dict = {
     'prompt_4': get_prompt_4,
 }
 
+close_resource = None
+resource_pool = None
+
 if __name__ == "__main__":
     # Argument parser
     parser = argparse.ArgumentParser(description="Filter models by query and GPU requirements.")
     parser.add_argument(
-        "--query",
+        "--models",
         type=str,
         default=None,
         help="Comma-separated list of query strings to filter models by name (case-insensitive). If not provided, all models are used."
@@ -68,17 +68,33 @@ if __name__ == "__main__":
         required=True,
         help="Specify the GPU type. Must be either 'a100' or 'h100'."
     )
+    parser.add_argument(
+        "--datasets",
+        type=str,
+        default=None,
+        help="Comma-separated list of query strings to filter datasets by name (case-insensitive). If not provided, all datasets are used."
+    )
     args = parser.parse_args()
     print("args=", args)
 
     # Prepare query list
-    queries = [q.strip().lower() for q in args.query.split(",")] if args.query else []
+    queries = [q.strip().lower() for q in args.models.split(",")] if args.models else []
+
+    dataset_queries = [q.strip().lower() for q in args.datasets.split(",")] if args.datasets else None
+
+
+    # Filter datasets
+    def dataset_matches(d):
+        return any(q in d["id"].lower() for q in dataset_queries) if dataset_queries else True
+
+
+    filtered_datasets = [d for d in datasets if dataset_matches(d)]
 
 
     # Filter models
     def model_matches(model):
         name_match = any(q in model["name"].lower() for q in queries) if queries else True
-        type_match = True if args.model_type is None else model["type"] == args.model_type
+        type_match = args.model_type is None or model["type"] == args.model_type
         return name_match and type_match
 
 
@@ -97,64 +113,45 @@ if __name__ == "__main__":
 
     for prompt, get_prompt in prompts_dict.items():
 
-        for dataset in datasets:  # TODO
-            data_source = dataset["data_source"]()
+        for model in models:
+            def build_model(env):
+                global close_resource, resource_pool  # <-- correct
+                if not resource_pool:
+                    overrides = model.get("kwargs", dict())
+                    overrides_gpu = model.get(f"kwargs_{args.gpu}", dict())
+                    llm_args = {**DEFAULTS, **overrides, **overrides_gpu}
+                    resource_pool, close_resource = asyncio.run(  # close model manually instead of framework doing it
+                        build_model_from_config(model, llm_args)
+                    )
+                return resource_pool
 
-            for model in models:
-                if "vllm_version" in model:
-                    assert model["vllm_version"] == version(
-                        "vllm"), f"Incorrect vllm version ({version('vllm')}), expected: {model['vllm_version']}"
 
-                print("=" * 100)
-                print(f"Running Benchmark for prompt {prompt}, model {model['basename']} and dataset {dataset['id']}.")
-                print("=" * 100)
+            for dataset in filtered_datasets:
+                data_source = dataset["data_source"]()
 
-                model_name = model["name"]
-                use_chat_template = model["type"] != "base"
+                benchmark_terminal_header = make_header(
+                    f"Running Benchmark for prompt {prompt}, model {model['basename']} and dataset {dataset['id']}.")
+                print(benchmark_terminal_header)
 
-                result_path = f"data/data_{prompt}/{dataset['id']}/{model['basename']}"
+                result_path = f"data_struct_output/data_{prompt}/{dataset['id']}/{model['basename']}"
                 os.makedirs(result_path, exist_ok=True)
-                overrides = model.get("kwargs", dict())
-                overrides_gpu = model.get(f"kwargs_{args.gpu}", dict())
-                llm_args = {**DEFAULTS, **overrides, **overrides_gpu}
-
-                async def build_model(env):
-                    #raise RuntimeError("This is a test!") # TODO
-                    from async_graph_bench.models.multi_vllm_instances import start_workers, RemoteVLLMModel, WorkerClient
-                    if not hasattr(env, "main_model_pool"):
-                        print(f"GPUs detected for worker building: {torch.cuda.device_count()}")
-                        # Note: this will throw the following error due to import/creation of cuda context by calling these functions - dont print it. Solution would be to share CUDA context somehow with subprocesses
-                        # RuntimeError: Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method
-                        # for i in range(torch.cuda.device_count()):
-                        #     props = torch.cuda.get_device_properties(i)
-                        #     free_mem = torch.cuda.mem_get_info(i)[0] / 1024 ** 3  # in GB
-                        #     total_mem = props.total_memory / 1024 ** 3  # in GB
-                        #     print(f"  GPU {i}: {props.name} | Free: {free_mem:.2f} GB / {total_mem:.2f} GB")
-                        worker_clients, close = await start_workers(
-                            model["name"],
-                            llm_kwargs=llm_args,
-                            gpus=list(range(torch.cuda.device_count())),
-                            gpus_per_worker=llm_args["tensor_parallel_size"],
-                        )
-                        models = [RemoteVLLMModel(worker_client, True) for worker_client in worker_clients]
-                        resource_pool = ResourcePool(models)
-                        resource_pool.close = close
-                        env.main_model_pool = resource_pool
-                    return [env.main_model_pool]
-
 
                 nodes = [
                     NodeConfig(
                         MultipleChoiceLabelProbGenerator(
                             get_prompt=partial(get_prompt, shots=dataset["shots"]),
                             model_type=model["type"],
-                            end_of_reasoning_pattern=model.get("end_of_reasoning_pattern", None),
                             system_prompt=model.get("system_prompt", None)
+                        ) if model['basename'] != "Magistral-Small-2507-Reasoning-Enabled"
+                        else MultipleChoiceLabelProbGeneratorMagistral(
+                            get_prompt=partial(get_prompt, shots=dataset["shots"]),
+                            system_prompt=model.get("system_prompt", None),
+                            max_tokens=4096
                         ),
                         data_store=DiskCacheStore,
                         resource_builder=build_model,
                         greedy=True,
-                        batch_size=150
+                        batch_size=100
                     ),
                     NodeConfig(
                         LabelProbExtractor(),
@@ -163,36 +160,35 @@ if __name__ == "__main__":
                     )
                 ]
 
-                with temporary_env(getattr(model, "env", dict())):
-                    man = BenchmarkManager(
-                        iterations=1,
-                        data_source=data_source,
-                        nodes=nodes,
-                        data_storage_path=result_path,
-                        show_progress_bars=True
-                    )
-                    #if man.base_adg:
-                    #    visualize_graph(man.base_adg, to_pdf=False)
-                    start = time.time()
-                    try:
-                        result = man.run_benchmark()
-                    except:
-                        pass
-                    end = time.time()
-                    print("Benchmarking finished!")
-                    print(man.get_formatted_report())
-                    elapsed = end - start
-                    human_readable = time.strftime("%H:%M:%S", time.gmtime(elapsed))
-                    end_h = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end))
-                    # write to file
-                    state = "  successful" if man.get_state() in ["skipped", "finished"] else "unsuccessful"
-                    msg = f"[{end_h}] Benchmark {state} for {prompt}, {dataset['id']} and {model['basename']} took {human_readable} to finish - Run states={[run.state for run in man.runs]}\n"
-                    with open("timing.log", "a") as f:
-                        f.write(msg)
-                    exceptions = [item for sublist in result["exceptions"].values() for item in sublist]
-                    if exceptions:
-                        message = 'Exceptions happened:' + str(exceptions)
-                        print(message)
+                man = BenchmarkManager(
+                    iterations=1,
+                    data_source=data_source,
+                    nodes=nodes,
+                    data_storage_path=result_path,
+                    show_progress_bars=True
+                )
+                try:
+                    man.run_benchmark()
+                except Exception as e:
+                    print(f"Benchmark failed for model {model['name']} and dataset {dataset['id']}: {e}")
+                    # you can send a notification here; raising to interrupt the benchmark.
+                    raise
+                report = man.get_report()
+                print(report.to_table())
+                report.write_csv_to_file("benchmark_log.csv", extra_data={
+                    "Model": model['name'],
+                    "Dataset": dataset['id'],
+                    "Prompt": prompt,
+                })
 
-                    del man
-                    gc.collect()
+                del man
+                gc.collect()
+
+            if close_resource is not None:
+                print("Closing main model resource pool...")
+                close_resource()
+                usage = resource_pool.get_usage_distribution()
+                with open("resource_usage.txt", "a") as f:
+                    f.write(f"Main model {model['basename']} usage:\n{usage}\n")
+                close_resource = None
+                resource_pool = None

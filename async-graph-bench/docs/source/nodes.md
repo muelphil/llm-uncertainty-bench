@@ -1,11 +1,19 @@
 # Nodes
 
-Nodes are the basis of this framework and responsible for calculation of intermediate and final steps.
+Nodes form the core of this framework and are responsible for computing both intermediate and final results in a benchmark.
 
-You will find the following information:
+The following sections provide detailed information:
 
-- [Data Source](nodes/data_sources.md) - singular nodes in the benchmark that provide the initial data, most of the times datasets, item by item
-- [Nodes](nodes/nodes.md) - on the implementation of nodes responsible for carrying out the calculation of intermediate and final results
-- [Node Configuration](nodes/node_configuration.md) - information about all possible configuration options for the nodes as they are provided to the
-  `BenchmarkManager`
-- [Sampling](nodes/sampling.md) - remarks on how to implement sampling nodes, that calculate scores based on multiple iterations of the same data
+## Overview of Node Concepts
+
+- **[Data Source](nodes/data_sources.md)**  
+  Nodes that provide the initial data, typically datasets, processed item by item.
+
+- **[Nodes](nodes/nodes.md)**  
+  Implementation of nodes responsible for performing the calculations for intermediate and final results.
+
+- **[Node Configuration](nodes/node_configuration.md)**  
+  Details on all configuration options available for nodes when used with the [`BenchmarkManager`](./api/benchmarkmanager.md).
+
+- **[Sampling](nodes/sampling.md)**  
+  Guidelines for implementing sampling nodes, which compute scores based on multiple iterations over the same data.

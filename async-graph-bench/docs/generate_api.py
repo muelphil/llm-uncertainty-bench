@@ -4,9 +4,12 @@ classes = [
     ("async_graph_bench.stores", "DataStore"),
     ("async_graph_bench.stores.serializers", "Serializer"),
     ("async_graph_bench.models", "Model"),
+    ("async_graph_bench.models", "ResponseWrapper"),
     ("async_graph_bench", "SamplingConfig"),
     ("async_graph_bench", "NodeConfig"),
+    ("async_graph_bench", "Node"),
     ("async_graph_bench", "visualize_graph"),
+    ("async_graph_bench", "GenerationParameters"),
     # add more (module, class) tuples here
     # e.g. ("async_graph_bench.executor", "Executor"),
 ]

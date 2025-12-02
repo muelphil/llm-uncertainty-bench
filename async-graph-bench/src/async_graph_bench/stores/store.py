@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import List, Iterator, Dict, Tuple, Any, Optional
+from typing import Iterator, Tuple, Any, Dict
+
+from ..data_source import Id
 
 
 class DataStore(ABC):
@@ -26,14 +28,21 @@ class DataStore(ABC):
         pass
 
     @abstractmethod
-    def iter_indices(self) -> Iterator[Tuple[int, int]]:
+    def iter_keys(self) -> Iterator[Tuple[Id, int]]:
         """
-        Retrieve a set of all item IDs & Iterations currently in the store.
+        Iterate over all item IDs & Iterations currently in the store.
         """
         pass
 
     @abstractmethod
-    def contains_id(self, id: Any, iteration=0):
+    def iter_items(self) -> Iterator[Dict[str, Any]]:
+        """
+        Iterate over all items currently in the store.
+        """
+        pass
+
+    @abstractmethod
+    def contains_key(self, id: Any, iteration=0):
         """
         Check if the store contains an item with the given ID.
 

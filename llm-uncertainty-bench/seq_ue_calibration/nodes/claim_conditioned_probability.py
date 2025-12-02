@@ -4,7 +4,7 @@ from typing import Dict
 
 
 class ClaimConditionedProbability:
-    dependencies = [
+    requires = [
         "assistant_tokens_decoded_alternatives",
         "assistant_tokens_alternatives_nli",
     ]

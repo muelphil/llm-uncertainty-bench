@@ -4,7 +4,20 @@ from typing import Dict, Any
 
 @contextmanager
 def temporary_env(env: Dict[str, Any]):
-    # Save old values
+    """
+    Temporarily set environment variables within a context.
+
+    Replaces the specified environment variables for the duration of the
+    context block and restores their previous values afterward.
+
+    Args:
+        env: Mapping of environment variable names to temporary values.
+
+    Example:
+        >>> with temporary_env({"MODE": "test"}):
+        ...     run_tests()
+        # Environment restored after context exit.
+    """
     old_env = {}
     try:
         for key, value in env.items():

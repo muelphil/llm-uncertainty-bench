@@ -1,6 +1,7 @@
-from async_graph_bench.models.reasoning_parsers import parse_deepseek_reasoning, parse_mistral_reasoning, \
-    parse_gpt_oss_reasoning
-from typing import Literal, Optional
+from typing import Literal
+
+from .reasoning_parsers import parse_deepseek_reasoning, parse_mistral_reasoning, \
+    parse_gpt_oss_reasoning, parse_qwen_reasoning
 
 try:
     import torch
@@ -16,7 +17,7 @@ def decode_if_byte(text: str):
 
 
 def decode_whitespace(text: str) -> str:
-    # TODO this is necessary because decoded_tokens does not return fully decoded tokens from vllm 0.7.0 anymore - this is an observation, not taken from any website. It is unclear why this behaviour was changed or if there is a way to prevent this
+    # TODO this is necessary because decoded_tokens does not return fully decoded tokens from vllm 0.7.0 anymore - this is an observation, not taken from any website. It is unclear why this behaviour was changed or if there is a way to prevent this. Never vllm version might not have this issue anymore
     return (text.replace("Ċ", "\n")
             .replace("▁", " ")
             .replace("Ġ", " "))
@@ -44,7 +45,7 @@ def find_index(lst, item):
         return -1
 
 
-ReasoningParserMode = Literal[None, "gpt-oss", "deepseek", "mistral"]
+ReasoningParserMode = Literal[None, "gpt-oss", "deepseek", "mistral", "qwen"]
 
 
 class VLLMResponseWrapper(ResponseWrapper):
@@ -75,17 +76,21 @@ class VLLMResponseWrapper(ResponseWrapper):
     def _parse_reasoning(self):
         if not self.has_logprobs:  # Note: In VLLM the decoded tokens are only available when logprobs is set
             raise ValueError("Logprobs are not available in the vLLM response.")
-        if self.reasoning_parser_mode == "gpt-oss" or self.reasoning_parser_mode == "deepseek":
+        if self.reasoning_parser_mode in ["gpt-oss", "deepseek", "qwen"]:
             tokens_per_output = self.get_tokens()
-            parser = (parse_gpt_oss_reasoning if self.reasoning_parser_mode == "gpt-oss" else parse_deepseek_reasoning)
+            parser = {
+                'gpt-oss': parse_gpt_oss_reasoning,
+                'deepseek': parse_deepseek_reasoning,
+                'qwen': parse_qwen_reasoning
+            }[self.reasoning_parser_mode]
             reasoning_indices = [parser(tokens) for tokens in tokens_per_output]
-        elif self.reasoning_parser_mode == "mistral":
+        elif self.reasoning_parser_mode == "mistral": # Magistral is checked at token id level instead, as tokens don't contain [THINK] decoded
             token_ids_per_output = self.get_token_ids()
             reasoning_indices = [parse_mistral_reasoning(token_ids) for token_ids in token_ids_per_output]
         else:
             raise ValueError("Unknown reasoning parser mode")
 
-        #for idx, reasoning_index in enumerate(reasoning_indices):
+        # for idx, reasoning_index in enumerate(reasoning_indices):
         #    if len(reasoning_index["reasoning"]) == 0:
         #        raise AssertionError("Reasoning mode specified, but no reasoning found in assistant response! " + str(self.get_tokens()[idx]) + " Token lengths= " + str([len(t) for t in self.get_tokens()]))
 

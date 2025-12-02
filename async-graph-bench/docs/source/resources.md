@@ -1,13 +1,22 @@
 # Resources
 
-* resources may be used for the calculation of statistics within nodes
-* resources are provided as part of the node configuration detailed in [Node Configuration](nodes/node_configuration.md)
-* the resource_builder must be a function that provides a resource
-* resource_builder functions get provided an environment so that a resource may be shared across multiple nodes.
-* multiple resources required for a single execution of a node may be specified
-* additionally, if multiple sets of these resources required by the nodes are available (for example 2 api endpoints), multiple resource sets may be provided, leading to multiple simultaneous runs of the node with the resources. For example, if 2 async endpoints are available and provided to the node, 2 instances of the node will be ran asynchronously using the resources when they are available, leading to a big improvement in benchmarking time.
+Resources provide controlled access to external or shared components used during node execution — for example, API clients, GPU handles, model instances, or database connections. They allow nodes to use expensive or limited objects efficiently and concurrently through a pooling mechanism.
 
-Abstract Examples:
+Each node that depends on one or more resources declares them through a **resource builder** in its [`NodeConfig`](./api/nodeconfig.md). Resource builders construct and configure the resources, wrap them in `ResourcePool` instances, and return them to the framework for coordinated use.
+
+---
+
+## Resource Builders
+
+A **resource builder** is a callable assigned to `NodeConfig.resource_builder`. It is responsible for creating one or multiple resources and returning them as one or more `ResourcePool` instances.
+
+Builders are invoked with a single argument — a **builder environment** (`env`) — which acts as a shared context. This environment allows resources to be constructed once and reused across multiple nodes that share the same dependencies. A builder may return a single `ResourcePool` or a list of pools if multiple independent resource types are needed. Builders may also be asynchronous if resource initialization requires async setup (e.g., opening connections).
+
+---
+
+## Example: Single Resource Type
+
+The following example defines an asynchronous API resource and a resource builder that creates a pool of two such resources.
 
 ```python
 class MyAPIResource:
@@ -15,64 +24,114 @@ class MyAPIResource:
         self.url = url
 
     async def get_result(self, query):
-        # use async fetch for url to get result
-        return result
+        # Perform an async request to the API
+        return await fetch_from_api(self.url, query)
+
+    def close(self):
+        # Close any persistent connections if necessary
+        pass
 ```
 
-Having multiple endpoints 
+A builder that creates two endpoints and registers cleanup:
+
 ```python
+from async_graph_bench import ResourcePool
+
+
 def build_resources(env):
-    if hasattr(env, "my_resources"):
-        return getattr(env, "my_resources")
-    resources = [
-        MyAPIResource("http://api.endpoint1.com"),
-        MyAPIResource("http://api.endpoint2.com")
-    ]
-    return resources
+    if not hasattr(env, "my_resources"):
+        resources = [
+            MyAPIResource("http://provider-a.com"),
+            MyAPIResource("http://provider-b.com"),
+        ]
+        pool = ResourcePool(resources)
+
+        def close():
+            for r in resources:
+                r.close()
+
+        pool.on_close(close)
+        env.my_resources = pool
+    return env.my_resources
 ```
-Example of Node
+
+This builder ensures resources are created only once per environment and are properly closed when the pool is terminated.
+
+A node that uses this resource might look like:
+
 ```python
 class MyNode:
     dependencies = ["query"]
     stats = ["result"]
 
-    async def __call__(self, item_stats: Dict[str, list], resource: MyAPIResource) -> Dict[str, List]:
+    async def __call__(self, item_stats: dict[str, list], resource: MyAPIResource) -> dict[str, list]:
         return {
             "result": [
-                await resource.get_result(number)
-                for number in item_stats["number"]
+                await resource.get_result(query)
+                for query in item_stats["query"]
             ]
         }
 ```
-Configuration of Node
+
+Configuration example:
+
 ```python
 NodeConfig(
     MyNode(),
-    resource_builder=build_resources
+    resource_builder=build_resources,
 )
 ```
 
-This will result in 2 instances of MyNode running, getting provided the 2 `MyAPIResource` resources as they are available as parameters to `__call__`
+If two resources are available, up to two concurrent instances of `MyNode` may execute — one per resource — significantly improving throughput.
 
-### If a node requires more than 1 resource
-Example:
+---
+
+## Example: Multiple Resource Types
+
+A node may depend on more than one resource type. In this case, the builder returns a list of `ResourcePool` instances. The framework ensures that a node instance acquires one resource from each pool before execution.
+
 ```python
+from async_graph_bench import ResourcePool
+
+
 def build_resources(env):
-    if hasattr(env, "resource_set"):
-        return getattr(env, "resource_set")
-    resource_set = [
-        (ResourceA(), ResourceB()) # <-- put resource sets in in tuple to provide multiple resources to a single node
-    ]
-    return resources
+    if not hasattr(env, "resource_a_pool"):
+        env.resource_a_pool = ResourcePool([ResourceA(), ResourceA()])  # 2 instances
+    if not hasattr(env, "resource_b_pool"):
+        env.resource_b_pool = ResourcePool([ResourceB(), ResourceB(), ResourceB()])  # 3 instances
+    return [env.resource_a_pool, env.resource_b_pool]
 ```
+
+If two `ResourceA` and three `ResourceB` instances are available, at most `min(2, 3) = 2` concurrent node executions can take place, since each run requires both resources.
+
+Example node using both:
+
 ```python
 class MyMultiResourceNode:
     dependencies = ["query"]
     stats = ["result"]
 
-    async def __call__(self, item_stats: Dict[str, list], resourceA: ResourceA, resourceB: ResourceB) -> Dict[str, List]:
-        # use resourceA and resourceB to calculate stat "result"
+    async def __call__(self, item_stats: dict[str, list], resourceA: ResourceA, resourceB: ResourceB) -> dict[str, list]:
+        # Perform combined computation using both resources
+        pass
 ```
 
-### Note:
-* combining multiple resources per node and multiple resource sets per node has not yet extensively been tested, as there was no use case that required both in parallel. It is advised to not use resources in different resource sets over different nodes, as this may result in conflict.
+Configuration:
+
+```python
+NodeConfig(
+    MyMultiResourceNode(),
+    resource_builder=build_resources,
+)
+```
+
+---
+
+## Summary
+
+Resources allow nodes to make efficient, concurrent use of shared or external objects. They are defined declaratively through **builders** that create and manage **pools**, ensuring reusability, proper cleanup, and scalability.
+
+* Builders are configured per node via `NodeConfig.resource_builder`.
+* Each builder returns one or more `ResourcePool` instances.
+* Pools automatically coordinate concurrent access and cleanup.
+* Multiple asynchronous resources enable concurrent execution of nodes.

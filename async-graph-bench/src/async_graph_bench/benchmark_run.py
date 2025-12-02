@@ -1,11 +1,11 @@
-import time
 import asyncio
 import gc
 import inspect
 import logging
 import sys
+import time
 from functools import reduce
-from typing import List, Dict, Optional, Set
+from typing import Dict, Optional, Set
 
 from async_graph_data_flow import AsyncExecutor, AsyncGraph
 from tqdm import tqdm
@@ -15,7 +15,7 @@ from .data_source import DataSource
 from .execution_nodes import data_cache, batching, skip_indices, skip_indices_data_source, \
     multi_incoming_node, with_resources, progress_wrapper, NodeExecutionWrapper, sampling, coordinated_end_of_data
 from .execution_nodes.data_source_execution_wrapper import DataSourceExecutionWrapper
-from .stores import DataStore
+from .manager import ExceptionInfo
 from .utils.builder_enviroment_stat_calculator import BuilderEnvironment
 
 log = logging.getLogger(__name__)
@@ -34,8 +34,13 @@ class BenchmarkRun:
             data_storage_path: str,
             show_progress_bars: bool,
             halt_on_exception: bool,
+            data_source_item_index: Dict[tuple, int],
             step: int = 1,
+            raise_exceptions=False
     ):
+        self.exceptions: List[ExceptionInfo] = []
+        self.start_time = None
+        self.end_time = None
         self.adg = adg
         self.step = step
 
@@ -47,10 +52,11 @@ class BenchmarkRun:
         self.resource_builder_env: BuilderEnvironment = BuilderEnvironment()
         self.show_progress_bars = show_progress_bars
         self.halt_on_exception = halt_on_exception
+        self.raise_exceptions = raise_exceptions
         self.resolved_at_start = dict()
 
         # per-run state
-        self.data_source_item_index: Dict[tuple, int] = {}
+        self.data_source_item_index: Dict[tuple, int] = data_source_item_index
         self.consumer_skip_indices: Dict[str, bitarray] = {}
         self.resources: Set = set()
         self._progress_bars: List[tqdm] = []
@@ -65,11 +71,7 @@ class BenchmarkRun:
             if node_config.always_recompute:
                 store.clear()
             self.store_per_node[node_config.id] = store
-
-        resolved_ids = set(store.iter_indices())
-        if node_config.is_sampling() and node_config.sampling_mode == "first":
-            resolved_ids = expand_resolved_ids(resolved_ids, self.iterations,
-                                               node_config.sampling_config.sampling_size)
+        resolved_ids = get_resolved_keys(store, node_config, self.iterations)
         return store, resolved_ids
 
     def init_graph(self):
@@ -77,17 +79,7 @@ class BenchmarkRun:
         Per-run initialization (previously 'init', but now for a single run/adg).
         Prepares data source item index and consumer skip indices according to stores.
         """
-        log.info("=" * 100)
-        log.info("Initializing benchmarking run (step=%s) ...", self.step)
-        log.info("=" * 100)
-
-        # Build combined ids for this run
-        all_ids = build_combined_ids(
-            self.data_source.iter_keys(),
-            iterations=self.iterations,
-            iterations_first=self.iterations_first
-        )
-        self.data_source_item_index = {item_id: index for index, item_id in enumerate(all_ids)}
+        log.info("Initializing Graph for Benchmarking Run (Step=%s) ...", self.step)
 
         # For greedy nodes in this ADG (note: ADG may have been modified to exclude nodes)
         for greedy_node_config in list(self.adg.greedy_nodes_configs):
@@ -131,7 +123,7 @@ class BenchmarkRun:
             iterations_first=self.iterations_first
         ).execute
 
-        if self.data_source_idx_skip_table:
+        if self.data_source_idx_skip_table.count(1):
             log.info(f"DataSource will skip {self.data_source_idx_skip_table.count(1)} items")
             generator = skip_indices_data_source(generator, self.data_source_idx_skip_table)
 
@@ -147,8 +139,7 @@ class BenchmarkRun:
             args = {
                 "name": node_config.id,
                 "unpack_input": False,
-                "max_tasks": 1
-                # node_config.max_tasks or 1 TODO more than 1 currently not supported due to issues arising with EndOfData signal
+                "max_tasks": node_config.max_tasks or 1
             }
             if node_config.queue_size:
                 args["queue_size"] = node_config.queue_size
@@ -168,6 +159,8 @@ class BenchmarkRun:
                     resources = asyncio.run(node_config.resource_builder(env=self.resource_builder_env))
                 else:
                     resources = node_config.resource_builder(env=self.resource_builder_env)
+                if not isinstance(resources, List):
+                    resources = [resources]
                 log.info("Successfully built resources")
                 # resources = node_config.resource_builder(env=self.resource_builder_env)
                 args["max_tasks"] *= min([pool.total() for pool in resources])
@@ -175,7 +168,7 @@ class BenchmarkRun:
                     set(flatten_recursive(resources) if isinstance(resources, Iterable) else [resources]))
                 generator = with_resources(generator, resources)
 
-            if args["max_tasks"] > 1: # TODO BIG - put in place again after testing
+            if args["max_tasks"] > 1:
                 generator = coordinated_end_of_data(generator, node_config.id)
 
             if node_config.batch_size and node_config.batch_size > 1:
@@ -189,14 +182,14 @@ class BenchmarkRun:
                     total_iterations=self.iterations,
                     mode=node_config.sampling_mode,
                     spread_keys=None if node_config.sampling_mode != "spread" else "all" if not hasattr(
-                        node_config.node, "stats") else node_config.node.stats
+                        node_config.node, "provides") else node_config.node.provides
                 )
 
             if store is not None:
                 generator = data_cache(
                     generator,
                     store=store,
-                    properties=node_config.node.stats if hasattr(node_config.node, "stats") else "all"
+                    properties=node_config.node.provides if hasattr(node_config.node, "provides") else "all"
                 )
 
             skip_table = None
@@ -228,7 +221,7 @@ class BenchmarkRun:
                     smoothing=0.0,
                     file=sys.stdout,
                     position=len(self._progress_bars),
-                    # when using batching, a lot of items will come in in less than 1/10 of a second - this prohibits the bar from displaying the updates individually
+                    # when using batching, a lot of items will come in less than 1/10 of a second - this prohibits the bar from displaying the updates individually
                     mininterval=1.0
                 )
                 bar.disable = True
@@ -238,7 +231,6 @@ class BenchmarkRun:
             if skip_table:
                 if skip_table.any() and skip_table != self.data_source_idx_skip_table:
                     generator = skip_indices(generator, skip_table)
-
 
             if self.adg.count_parents(node_config) > 1:
                 generator = multi_incoming_node(generator, self.adg.count_parents(node_config))
@@ -256,14 +248,14 @@ class BenchmarkRun:
 
         return execution_graph
 
-    def run(self) -> Dict[str, Any]:
+    def run(self):
         """
         Execute this run. Returns same shape dict as original UEManager: {exceptions, stores}
         """
         if self.state == "skipped":
             log.warning(
-                "Skipping execution (run): nothing to calculate for this step - graph does not contain any greedy nodes.")
-            return {"exceptions": {}, "stores": self.store_per_node}
+                "Skipping execution: nothing to calculate for this step - graph does not contain any greedy nodes.")
+            return
 
         log.info(f"Building execution graph for step {self.step}")
         try:
@@ -272,32 +264,48 @@ class BenchmarkRun:
         except Exception as e:
             self.state = "crashed"
             log.exception(f"Unexpected error during run initialization: {e}")
-            raise
+            self.exceptions.append(ExceptionInfo(e, self))
+            if self.raise_exceptions:
+                raise
+            else:
+                return
+
         log.info(f"Built execution graph for step {self.step}")
         try:
-            for pb in self._progress_bars:
-                pb.disable = False
-                pb.refresh()
+            if self._progress_bars:
+                for pb in self._progress_bars:
+                    pb.disable = False
+                    pb.refresh()
             self.start_time = time.time()
             executor.execute()
         except KeyboardInterrupt:
-            log.warning("Received KeyboardInterrupt, cleaning up... please wait!")
+            log.warning("Received KeyboardInterrupt, cleaning up... Please wait!")
             raise
         finally:
-            self.state = "crashed" if any(len(excp) for excp in executor.exceptions.values()) else "finished"
+            if self._progress_bars:
+                for pb in self._progress_bars:
+                    pb.disable = True
+                    pb.refresh()
+                    pb.close()
+            sys.stdout.write("\n" * (len(self._progress_bars) + 1))
+            sys.stdout.flush()
+
+            for node, exceptions in executor.exceptions.items():
+                for exception in exceptions:
+                    self.exceptions.append(ExceptionInfo(exception, node))
+
+            if self.exceptions:
+                self.state = "crashed"
+            else:
+                self.state = "finished"
+
             self.end_time = time.time()
             self.elapsed = self.end_time - self.start_time
-            for resource in self.resources:  # TODO it would be nice if there is the option for the user to manually handle resource closing
-                if hasattr(resource, 'close') and callable(resource.close):
-                    asyncio.run(resource.close()) if inspect.iscoroutinefunction(resource.close) else resource.close()
+            for resource in self.resources:
+                resource.close()
             self.resources = set()
             # flush shared stores (manager will also flush at the end, but flush here after each run too)
             for store in self.store_per_node.values():
                 store.flush()
             del execution_graph
             gc.collect()
-
-        return {
-            "exceptions": {k: v for k, v in executor.exceptions.items() if v},
-            "stores": self.store_per_node
-        }

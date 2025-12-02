@@ -1,5 +1,4 @@
 async_graph_bench==0.1.0
-datasets==4.0.0
 diskcache==5.6.3
 matplotlib==3.10.6
 numpy==2.3.3
@@ -10,9 +9,9 @@ tiktoken==0.11.0
 torch==2.7.1
 tqdm==4.67.1
 transformers==4.56.0
-vllm==0.10.1.1
 jupyterhub==5.3.0
 matplotlib==3.10.6
 scikit-learn==1.7.2
 datasets==4.1.1
 pandas==2.3.2
+vllm==0.11.2

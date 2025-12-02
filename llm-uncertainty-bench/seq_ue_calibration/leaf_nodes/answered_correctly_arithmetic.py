@@ -17,10 +17,10 @@ def extract_number(s):
 
 
 class AnsweredCorrectlyArithmeticSimple:
-    dependencies = ["sampled_conclusion_texts", "correct_answer", "sampled_assistant_tokens_decoded",
-                    "sampled_reasoning_tokens_decoded"]
-    stats = ["is_correct", "extracted_number", "correct_answer", "answer_token_len", "reasoning_token_len",
-             "frequency_of_answer"]
+    requires = ["sampled_conclusion_texts", "correct_answer", "sampled_assistant_tokens_decoded",
+                "sampled_reasoning_tokens_decoded", "finish_reasons", "finish_reasons_post"]
+    provides = ["is_correct", "extracted_number", "correct_answer", "answer_token_len", "reasoning_token_len",
+                "frequency_of_answer", "finish_reasons", "finish_reasons_post"]
 
     spread = True
 
@@ -34,7 +34,8 @@ class AnsweredCorrectlyArithmeticSimple:
                 deps["sampled_reasoning_tokens_decoded"]
         ):
             extracted_numbers = [extract_number(conclusion_text) for conclusion_text in conclusion_text_samples]
-            frequency_of_answer = [(extracted_numbers.count(extracted_number) / len(extracted_numbers)) if extracted_number is not None else 0.0
+            frequency_of_answer = [(extracted_numbers.count(extracted_number) / len(
+                extracted_numbers)) if extracted_number is not None else 0.0
                                    for extracted_number in extracted_numbers]
             is_correct = [correct_answer == extracted for extracted in extracted_numbers]
 
@@ -44,5 +45,6 @@ class AnsweredCorrectlyArithmeticSimple:
             result["correct_answer"].append(correct_answer)
             result["frequency_of_answer"].append(frequency_of_answer)
             result["is_correct"].append(is_correct)
-
+        result["finish_reasons"] = deps["finish_reasons"]
+        result["finish_reasons_post"] = deps["finish_reasons_post"]
         return result

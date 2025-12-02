@@ -7,10 +7,13 @@ def decode_if_byte(text: str):
     return text.decode("utf-8", errors="replace") if isinstance(text, bytes) else text
 
 
-def decode_whitespace(text: str) -> str:
+def sanitize_token(text: str) -> str:
     return (text.replace("Ċ", "\n")
             .replace("▁", " ")
-            .replace("Ġ", " "))
+            .replace("Ġ", " ")
+            .replace("<｜end of sentence｜>", "")
+            .replace("<|im_end|>","")
+            .replace('<|eot_id|>', ''))
 
 
 class ResponseCompressorSerializer:  # TODO move to async-graph-bench
@@ -43,7 +46,7 @@ class ResponseCompressorSerializer:  # TODO move to async-graph-bench
             return data
 
         alternatives_per_token = data[f"{self.prefix}_tokens_decoded_alternatives"]
-        alternatives_per_token = [[[decode_whitespace(decode_if_byte(token)), score] for token, score in sublist] for sublist in
+        alternatives_per_token = [[[sanitize_token(decode_if_byte(token)), score] for token, score in sublist] for sublist in
                                   alternatives_per_token]  # this is necessary because sentencepiece in its more
         data[f"{self.prefix}_tokens_decoded_alternatives"] = alternatives_per_token
         removed_keys = data['_removed_keys']

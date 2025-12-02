@@ -1,206 +1,203 @@
-from async_graph_bench.models.openai_api_model import OpenAIAPIModel
-from async_graph_bench.models import GenerationParameters
 import os
-import asyncio
-from tqdm import tqdm
 import re
-import argparse
-import gc
-import traceback
-import os
-import time
 from collections import Counter
+
 from dotenv import load_dotenv
 
-from async_graph_bench import CSVDataStore, DataSource, NodeConfig, SamplingConfig, BenchmarkManager, Node, \
-    visualize_graph, DiskCacheStore
+from async_graph_bench import DataSource, NodeConfig, SamplingConfig, BenchmarkManager, visualize_graph, ResourcePool, \
+    JSONDataStore, Model
+from async_graph_bench.models import GenerationParameters
+from async_graph_bench.models.openai_api_model import OpenAIAPIModel
 
-for prefix in ['BLABLADOR']:
-    print(f"{prefix}_BASE_URL=", os.environ.get(f"{prefix}_BASE_URL", None))  # They need to be set, throw otherwise
-    api_key = os.environ.get(f"{prefix}_API_KEY", None)  # They need to be set, throw otherwise
-    print(f"{prefix}_API_KEY=", (api_key[:3] + '*' * (len(api_key) - 3) if api_key else None))
+# Load environment variables for OpenAI API
+load_dotenv()
+print("===== ENV =====")
+print(f"OPENAI_API_ENDPOINT_BASE_URL=",
+      os.environ.get(f"OPENAI_API_ENDPOINT_BASE_URL", None))  # Ensure this is set
+api_key = os.environ.get(f"OPENAI_API_ENDPOINT_API_KEY", None)  # Ensure this is set
+print(f"OPENAI_API_ENDPOINT_API_KEY=", (api_key[:3] + '*' * (len(api_key) - 3) if api_key else None))
+print(f"OPENAI_API_ENDPOINT_MODEL=", os.environ.get(f"OPENAI_API_ENDPOINT_MODEL", None))
+print("\n\n")
+
+# Regex patterns to parse model responses
+pattern_comma_separated = re.compile(r"(?:\d+\s*,\s*)+\d+")
+pattern_numbered_list = re.compile(r"\d+\. \d+")
 
 
-class DummyDataSource(DataSource):
-    stats = ['idx']
+def extract_comma_separated(response: str):
+    """Extracts the number of items from a comma-separated string of numbers."""
+    match = pattern_comma_separated.search(response)
+    if match:
+        seq = match.group(0)
+        nums = [n.strip() for n in seq.split(",")]
+        return len(nums)
+    return 0
+
+
+def extract_from_numbered_list(response: str):
+    """Extracts the number of items from a numbered list."""
+    return len(pattern_numbered_list.findall(response))
+
+
+# Prompts to instruct the model
+PROMPT_COMMA_SEPARATED = "Output {number_items} random integers between 1 and 100, comma-separated, without any additional text or introduction."
+PROMPT_NUMBERED_LIST = "Output {number_items} random integers between 1 and 100 in a numbered list."
+
+amount_items = 28
+
+
+class PromptSource(DataSource):
+    """
+    Provides two items with prompts to generate random integers:
+    - Comma-separated integers
+    - Numbered list of integers
+    Each item also provides the corresponding extractor function.
+    """
+    provides = ["number_items", "prompt", "extractor"]
+    items = [
+        {
+            "id": ("comma_separated", amount_items),
+            "number_items": amount_items,
+            "prompt": PROMPT_COMMA_SEPARATED.format(number_items=amount_items),
+            "extractor": extract_comma_separated
+        },
+        {
+            "id": ("numbered_list", amount_items),
+            "number_items": amount_items,
+            "prompt": PROMPT_NUMBERED_LIST.format(number_items=amount_items),
+            "extractor": extract_from_numbered_list
+        },
+    ]
 
     def __len__(self):
-        return 1
+        return len(self.items)
+
+    def iter_ids(self):
+        for item in self.items:
+            yield item["id"]
 
     async def iter_items(self):
-        yield {"id": 0, "idx": 0}
-
-    def iter_keys(self):
-        yield 0
+        for item in self.items:
+            yield item
 
 
 class ResponseGenerator:
-    dependencies = ['idx']
+    """
+    Calls a language model to generate responses for a given prompt.
+    Produces 'response' output for each input item.
+    """
+    requires = ["prompt"]
+    provides = ["response"]
+    description = "Generates a response for a prompt using an LLM"
 
-    def __init__(self, prompt, stat):
-        self.prompt = prompt
-        self.stats = [stat]
+    def __init__(self):
         self.params = GenerationParameters(max_tokens=400)
-        self.id = f"ResponseGenerator[{stat}]"
 
-    async def __call__(self, item_stats, model):
-        res = await model.query(self.prompt, self.params)
-        return {
-            self.stats[0]: res.get_messages()
-        }
+    async def __call__(self, item_stats, model: Model):
+        # The model is provided by the framework via resource_builder
+        res = await model.query(item_stats["prompt"], self.params)
+        return {"response": res.get_messages()}
 
 
-# class CommaSeparatedCounter:
-#     dependencies = ['comma_separated']
-#     stats = ['comma_separated_length']
-#
-#     def __call__(self, item_stats):
-#         responses = item_stats["comma_separated"]
-#         length = [len(r.split(",")) for r in responses]
-#         return {
-#             "comma_separated_length": length
-#         }
-
-class CommaSeparatedCounter:
-    dependencies = ['comma_separated']
-    stats = ['comma_separated_length']
+class LengthExtractor:
+    """
+    Extracts the number of items from the model's response using the provided extractor.
+    Produces 'length' output.
+    """
+    requires = ["extractor", "response"]
+    provides = ["length"]
+    description = "Extracts the number of items from the model's response"
 
     def __call__(self, item_stats):
-        responses = item_stats["comma_separated"]
-        lengths = []
-
-        # Regex: find sequences like "12, 34, 56"
-        pattern = re.compile(r"(?:\d+\s*,\s*)+\d+")
-
-        for r in responses:
-            match = pattern.search(r)
-            if match:
-                # Extract the sequence of numbers
-                seq = match.group(0)
-                # Split by comma and strip spaces
-                nums = [n.strip() for n in seq.split(",")]
-                lengths.append(len(nums))
-            else:
-                # No valid sequence found
-                lengths.append(0)
-
-        return {"comma_separated_length": lengths}
+        responses = item_stats["response"]
+        length = [
+            extractor(response)
+            for response, extractor
+            in zip(item_stats["response"], item_stats["extractor"])
+        ]
+        return {"length": length}
 
 
-class NumberedListCounter:
-    dependencies = ['numbered_list']
-    stats = ['numbered_list_length']
-    pattern = re.compile(r"\d+\. \d+")
+class SampleLengthCounter:
+    """
+    Counts occurrences of each length across sampled runs and computes accuracy.
+    Requires sampled lengths and expected number of items.
+    Produces 'counts' and 'accuracy'.
+    """
+    requires = ["sampled_length", "number_items"]
+    description = "Counts occurrences of each length across sampled runs and computes accuracy"
 
     def __call__(self, item_stats):
-        responses = item_stats["numbered_list"]
-        length = [len(self.pattern.findall(r)) for r in responses]
+        samples = item_stats["sampled_length"]
+        number_items = item_stats["number_items"]
+        counts = [dict(Counter(s)) for s in samples]
+        accuracy = [
+            c.get(n, 0) / len(s) if len(s) > 0 else 0
+            for c, s, n in zip(counts, samples, number_items)
+        ]
         return {
-            "numbered_list_length": length
-        }
-
-
-class LengthCounter:
-
-    def __init__(self, dependency):
-        self.dep = "sampled_" + dependency
-        self.dependencies = [self.dep]
-        self.id = f"LengthCounter[{self.dep}]"
-
-    def __call__(self, item_stats):
-        samples = item_stats[self.dep]
-        return {
-            'counts': [dict(Counter(s)) for s in samples]
+            "counts": counts,
+            "accuracy": accuracy
         }
 
 
 if __name__ == "__main__":
-    print("Running Benchmark")
-    data_source = DummyDataSource()
+    data_source = PromptSource()
 
-    model = OpenAIAPIModel(
-        model_path="1 - Ministral 8b - the fast model",
-        openai_endpoint=os.environ.get(f"BLABLADOR_BASE_URL"),
-        openai_api_key=os.environ.get(f"BLABLADOR_API_KEY")
-    )
-    PROMPT_NUMBERED_1 = "Output 27 random integers between 1 and 100, comma-separated, without any additional text or introduction."
-    PROMPT_NUMBERED_2 = """Produce exactly 27 lines. Each line must be:
-<n>. <N>
-where <n> is 1..27 in ascending order, a literal dot, one space, and <N> is a random integer 1–100.  
-Output only those 27 lines and nothing else."""
+    def resource_builder(env):
+        if not hasattr(env, "main_pool"):
+            model = OpenAIAPIModel(
+                model_id=os.environ.get(f"OPENAI_API_ENDPOINT_MODEL"),
+                openai_endpoint=os.environ.get(f"OPENAI_API_ENDPOINT_BASE_URL"),
+                openai_api_key=os.environ.get(f"OPENAI_API_ENDPOINT_API_KEY")
+            )
+            env.main_pool = ResourcePool([model])
+        return env.main_pool
 
     nodes = [
         NodeConfig(
-            ResponseGenerator(
-                prompt="Output 27 random integers between 1 and 100, comma-separated.",
-                stat="comma_separated"),
-            data_store=DiskCacheStore,
-            resource_builder=lambda env: model,
+            ResponseGenerator(),
+            data_store=JSONDataStore,
+            resource_builder=resource_builder,
             greedy=True,
-            id="ResponseGenerator[comma_separated]"
         ),
-        NodeConfig(
-            ResponseGenerator(prompt="Output 27 random integers between 1 and 100 in a numbered list.",
-                              stat="numbered_list"),
-            data_store=DiskCacheStore,
-            resource_builder=lambda env: model,
-            greedy=True,
-            id="ResponseGenerator[numbered_list]"
-        ),
-
     ]
 
+    iterations = 10
+
     consumer_nodes = [
-        # in the consumer_nodes array, all NodeConfigs will receive greedy=True und data_store=CSVDataStore
-        # you can also simply provide them in nodes with these parameters
-        NodeConfig(CommaSeparatedCounter(), always_recompute=True),
-        NodeConfig(NumberedListCounter(), always_recompute=True),
+        NodeConfig(LengthExtractor()),
+        # SampleLengthCounter samples multiple iterations to evaluate accuracy, recomputes every run
         NodeConfig(
-            LengthCounter(dependency="numbered_list_length"),
-            sampling_config=SamplingConfig(sampling_size=100),
-            always_recompute=True
-        ),
-        NodeConfig(
-            LengthCounter(dependency="comma_separated_length"),
-            sampling_config=SamplingConfig(sampling_size=100),
-            always_recompute=True
+            SampleLengthCounter(),
+            always_recompute=True,
+            sampling_config=SamplingConfig(sampling_size=iterations)
         )
     ]
 
     man = BenchmarkManager(
-        iterations=100,
+        iterations=iterations,
         iterations_first=True,
         data_source=data_source,
         nodes=nodes,
         consumer_nodes=consumer_nodes,
-        data_storage_path=f"data",
+        data_storage_path="data",
         show_progress_bars=True,
-        halt_on_exception=True
+        halt_on_exception=True,
+        raise_exceptions=True
     )
-    print("Created Manager")
-    visualize_graph(man.base_adg, to_pdf=True)
-    try:
-        result = man.run_benchmark()
-        print("Benchmarking finished!")
-        exceptions = [item for sublist in result["exceptions"].values() for item in sublist]
-        if exceptions:
-            message = 'Exceptions happened:' + str(exceptions)
-            print(message)
-        else:
-            print("Successfully finished")
-    except Exception as e:
-        traceback.print_exc()
-    finally:
-        gc.collect()
-        # visualize_graph(
-        #     man.runs[-1].adg,
-        #     to_pdf=True,
-        #     output_file="run_graph",
-        #     show_descriptions=True,
-        #     resolved_counts=man.runs[-1].resolved_at_start
-        # )
 
-# Give me 27 random integers between 1 and 100, comma separated.
-# 27, 27, 28, 28, 29, 27, 28, 28, 29, 27, 27, 28, 27, 28, 28, 26, 28, 28, 28, 28, 28, 27, 27, 29, 30, 27, 29, 27, 30, 28, 28, 28, 29, 26, 28, 27, 29, 28, 27, 28, 51, 28, 27, 27, 29, 27, 30, 35, 27, 28, 28, 27, 27, 28, 28, 29, 29, 28, 29, 27, 28, 28, 29, 29, 27, 28, 26, 29, 28, 27, 26, 28, 27, 27, 27, 30, 28, 29, 28, 27, 28, 26, 29, 27, 28, 27, 28, 28, 27, 29, 28, 26, 28, 28, 29, 28, 26, 28, 29, 30
-# Give me 27 random integers between 1 and 100 in a numbered list.
-# 27, 27, 27, 27, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 0, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 0, 27, 27, 27, 27, 27, 27, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 0, 27, 27, 27, 26, 27, 27, 27, 27, 27, 27, 27, 0, 27, 27, 0, 27, 27, 27, 27, 27, 27, 27, 27, 27, 26, 27, 27, 27, 27, 27, 27, 27, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27
+    # Generate an SVG of the execution graph
+    visualize_graph(man.base_adg, format="svg")
+
+    # Run the benchmark
+    man.run_benchmark()
+    report = man.get_report()
+    print(report.to_table())
+
+    # Print accuracy results per prompt
+    store = man.store_per_node["SampleLengthCounter"]
+    for row in store.iter_items():
+        print(
+            f"Prompt with id {row['id']}\t provided requested number of random numbers with an accuracy of {row['accuracy'] * 100:.1f}% (Counts={row['counts']})"
+        )

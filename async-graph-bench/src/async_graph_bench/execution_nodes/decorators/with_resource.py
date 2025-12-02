@@ -1,7 +1,10 @@
+import logging
 from typing import List
 
 from ...utils import acquire_from_many
 from ...utils.end_of_data import EndOfData
+
+log = logging.getLogger(__name__)
 
 
 def with_resources(generator, resource_pools: List["ResourcePool"]):
@@ -26,6 +29,7 @@ def with_resources(generator, resource_pools: List["ResourcePool"]):
             if isinstance(item, EndOfData):
                 async for output in generator(item):
                     yield output
+                log.info(pool.get_usage_distribution())
             else:
                 async with await pool.acquire() as resource:
                     async for output in generator(item, resource):
@@ -39,6 +43,8 @@ def with_resources(generator, resource_pools: List["ResourcePool"]):
             if isinstance(item, EndOfData):
                 async for output in generator(item):
                     yield output
+                for pool in resource_pools:
+                    log.info(pool.get_usage_distribution())
             else:
                 async with await acquire_from_many(resource_pools) as resources:
                     # ensure tuple, so we can unpack consistently

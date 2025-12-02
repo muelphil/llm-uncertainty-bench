@@ -6,17 +6,17 @@ DEFAULTS = {
     "gpu_memory_utilization": 0.90,
     "enable_prefix_caching": True,
     "enforce_eager": True,
-    "max_model_len": 6114,
+    "max_model_len": 16384,
     "seed": random.getrandbits(32)
 }
 
 # https://huggingface.co/mistralai/Magistral-Small-2506
-MAGISTRAL_SYSTEM_PROMPT = """A user will ask you to solve a task. You should first draft your thinking process (inner monologue) until you have derived the final answer. Afterwards, write a self-contained summary of your thoughts (i.e. your summary should be succinct but contain all the critical steps you needed to reach the conclusion). You should use Markdown to format your response. Write both your thoughts and summary in the same language as the task posed by the user. NEVER use \boxed{} in your response.
+MAGISTRAL_SYSTEM_PROMPT = """A user will ask you to solve a task. You should first draft your thinking process (inner monologue) until you have derived the final answer. Afterwards, write a self-contained summary of your thoughts (i.e. your summary should be succinct but contain all the critical steps you needed to reach the conclusion). You should use Markdown to format your response. Write both your thoughts and summary in the same language as the task posed by the user. NEVER use \\boxed{} in your response.
 
 Your thinking process must follow the template below:
-<think>
+[THINK]
 Your thoughts or/and draft, like working through an exercise on scratch paper. Be as casual and as long as you want until you are confident to generate a correct answer.
-</think>
+[/THINK]
 
 Here, provide a concise summary that reflects your reasoning and presents a clear final answer to the user. Don't mention that this is a summary.
 
@@ -28,20 +28,18 @@ MODELS = [
         # pass chat_template_kwargs={"reasoning_effort": "low"} to handle reasoning
         # the following was tested again and didn't prove correct (leaving it for documentation): adding "<|channel|>analysis<|message|>a<|end|><|start|>assistant<|channel|>final<|message|>" to the input prompt "disables" the reasoning completely
         "name": "openai/gpt-oss-20b",
-        "kwargs": {},
+        "kwargs": {"reasoning_parser": "openai_gptoss"}, # vllm reasoning specific parser
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
         "type": "reasoning",
-        "end_of_reasoning_pattern": ['<|end|>', '<|start|>', 'assistant', '<|channel|>', 'final', '<|message|>'],
-        "reasoning_parser": "gpt-oss"
+        "reasoning_parser": "gpt-oss" # async-graph-bench reasoning specific parser
     },
     {
         "name": "openai/gpt-oss-120b",
-        "kwargs": {},
+        "kwargs": {"reasoning_parser": "openai_gptoss"},
         "kwargs_a100": {"tensor_parallel_size": 4},
         "kwargs_h100": {"tensor_parallel_size": 2},
         "type": "reasoning",
-        "end_of_reasoning_pattern": ['<|end|>', '<|start|>', 'assistant', '<|channel|>', 'final', '<|message|>'],
         "reasoning_parser": "gpt-oss"
     },
 
@@ -92,19 +90,17 @@ MODELS = [
     #     "kwargs_a100": {"tensor_parallel_size": 2},
     #     "kwargs_h100": {"tensor_parallel_size": 1},
     #     "type": "reasoning",
-    #     "end_of_reasoning_pattern": [35],  # [/THINK]
     #     "reasoning_parser": "mistral"
     # },
     {
         "name": "mistralai/Magistral-Small-2507",
         "basename": "Magistral-Small-2507", # <===============
         "shortname": "Magistral-Small-24B-Reasoning", # <===============
-        "kwargs": {"tokenizer_mode": "mistral", "load_format": "mistral",
+        "kwargs": {"tokenizer_mode": "mistral", "load_format": "mistral", "reasoning_parser": "mistral",
                    "config_format": "mistral", "gpu_memory_utilization": 0.90},
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
         "type": "reasoning",
-        "end_of_reasoning_pattern": [35],  # [/THINK]
         "system_prompt": MAGISTRAL_SYSTEM_PROMPT,  # <===============
         "reasoning_parser": "mistral"
     },
@@ -159,11 +155,10 @@ MODELS = [
         # pass chat_template_kwargs={"enable_thinking": True} to handle reasoning ouput
         "name": "Qwen/Qwen3-30B-A3B-Thinking-2507",
         "shortname": "Qwen3-30B-A3B-Thinking",
-        "kwargs": {"enable_expert_parallel": True},
+        "kwargs": {"enable_expert_parallel": True, "reasoning_parser": "qwen3"},
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
         "type": "reasoning",
-        "end_of_reasoning_pattern": ['</think>', '\n\n'],
         "reasoning_parser": "deepseek"
     },
 
@@ -171,20 +166,19 @@ MODELS = [
     {
         "name": "deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
         "shortname": "DeepSeek-Llama-70B",
-        "kwargs": {"gpu_memory_utilization": 0.95},
+        "kwargs": {"gpu_memory_utilization": 0.95, "reasoning_parser": "deepseek_r1"},
         "kwargs_a100": {"tensor_parallel_size": 4},
         "kwargs_h100": {"tensor_parallel_size": 2},
         "type": "reasoning",
-        "end_of_reasoning_pattern": ['</think>', '\n\n'],
         "reasoning_parser": "deepseek"
     },
     {
         "name": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
         "shortname": "DeepSeek-Qwen-32B",
+        "kwargs": {"reasoning_parser": "deepseek_r1"},
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
         "type": "reasoning",
-        "end_of_reasoning_pattern": ['</think>', '\n\n'],
         "reasoning_parser": "deepseek"
     },
 

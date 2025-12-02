@@ -1,5 +1,3 @@
-import sys
-
 from ...utils.end_of_data import EndOfData
 
 
@@ -20,9 +18,6 @@ def progress_wrapper(generator, progress_bar):
         async for result in generator(item):
             if isinstance(result, EndOfData):
                 progress_bar.refresh()
-                sys.stdout.flush()
-                sys.stderr.flush()
-                progress_bar.disable = True
             else:
                 progress_bar.update(1)  # Increment the progress bar
             yield result  # Yield the item as usual

@@ -21,12 +21,15 @@ def multi_incoming_node(generator, incoming_nodes_count):
     async def wrapped(item):
         combined_id = get_combined_id(item) if not isinstance(item, EndOfData) else EndOfData
 
-        if (count_per_index[combined_id] + 1) == incoming_nodes_count:
-            del count_per_index[combined_id]
+        should_process = False
+        async with lock:
+            count_per_index[combined_id] += 1
+            if count_per_index[combined_id] == incoming_nodes_count:
+                should_process = True
+                del count_per_index[combined_id]
+
+        if should_process:
             async for result in generator(item):
                 yield result
-        else:
-            async with lock:
-                count_per_index[combined_id] += 1
 
     return wrapped

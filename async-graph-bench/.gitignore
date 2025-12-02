@@ -1,3 +1,7 @@
+**/.env
+**/data/
+todo.md
+
 .idea
 **/.DStore
 workdir/

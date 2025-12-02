@@ -1,7 +1,7 @@
 from data_sources import MMLUDataSetProvider, ArcReasoningDataSetProvider, GSM8KDatasetProvider, SciQDataSetProvider, \
     SVampDatasetProvider, SciBenchDatasetProvider, GPQADataSetProvider
 
-subsample_size = 1000
+subsample_size = 250
 
 DATASETS = [
     {

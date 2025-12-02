@@ -47,7 +47,7 @@ def shuffle_with_hash_seed(string, array):
 
 
 class GPQADataSetprovider(DataSource):
-    stats = ["questions", "options"]
+    provides = ["questions", "options"]
 
     def __init__(self, limit_items=None):
         # Load both ARC-Easy and ARC-Challenge datasets
@@ -87,7 +87,7 @@ class GPQADataSetprovider(DataSource):
                 "options": row["options"]
             }
 
-    def iter_keys(self):
+    def iter_ids(self):
         for idx, row in self.df.iterrows():
             yield row.name
 

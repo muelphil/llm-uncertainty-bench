@@ -6,7 +6,7 @@ from async_graph_bench import DataSource
 
 
 class MMLUDataSetProvider(DataSource):
-    stats = ["questions", "options"]
+    provides = ["questions", "options"]
 
     def __init__(self, limit_items=None):
         # Load the entire MMLU dataset (all subjects)
@@ -30,7 +30,7 @@ class MMLUDataSetProvider(DataSource):
                 "options": row['choices']
             }
 
-    def iter_keys(self):
+    def iter_ids(self):
         for idx, row in self.df.iterrows():
             yield row.name
 

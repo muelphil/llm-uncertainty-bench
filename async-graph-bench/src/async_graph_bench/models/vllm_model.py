@@ -3,11 +3,13 @@ try:
         destroy_model_parallel,
         destroy_distributed_environment,
     )
+    from vllm import LLM
     from vllm.sampling_params import SamplingParams
-    from vllm.sampling_params import GuidedDecodingParams
+    from vllm.sampling_params import StructuredOutputsParams
+
 except ImportError as e:
     raise ImportError(
-        "To use this functionality, you need to install the 'vllm' module"
+        "To use this functionality, you need to install the 'vllm' module version 0.11 or higher"
     ) from e
 try:
     import torch
@@ -42,30 +44,27 @@ def sampling_params_from_generation_params(generation_params: GenerationParamete
     if "response_format" in params_dict:
         response_format = params_dict["response_format"]
         if response_format["type"] == "json_schema":
-            guided_decoding_params = GuidedDecodingParams(json=response_format["json_schema"])
-        elif response_format["type"] == "json_object":
-            guided_decoding_params = GuidedDecodingParams(json_object=True)
-        elif response_format["type"] == "json_object":
-            guided_decoding_params = GuidedDecodingParams(json_object=True)
+            guided_decoding_params = StructuredOutputsParams(json=response_format["json_schema"])
         elif response_format["type"] == "choice":
-            guided_decoding_params = GuidedDecodingParams(choice=response_format["choice"])
+            guided_decoding_params = StructuredOutputsParams(choice=response_format["choice"])
         elif response_format["type"] == "regex":
-            guided_decoding_params = GuidedDecodingParams(regex=response_format["regex"])
+            guided_decoding_params = StructuredOutputsParams(regex=response_format["regex"])
         else:
-            raise NotImplementedError(f"GenerationsParameter Response Format Type {response_format} not supported")
+            raise NotImplementedError(f"StructuredOutputsParams Response Format Type {response_format} not supported")
         del params_dict["response_format"]
         params_dict["guided_decoding"] = guided_decoding_params
     return SamplingParams(**params_dict)
 
 
 class VLLMModel(Model):
-    def __init__(self, model, use_chat_template=True, reasoning_parser_mode: ReasoningParserMode = None):
+    def __init__(self, model: LLM, use_chat_template=True, reasoning_parser_mode: ReasoningParserMode = None):
         self.model = model
         self.use_chat_template = use_chat_template
         self.reasoning_parser_mode = reasoning_parser_mode
         self.query_model = self.model.chat if self.use_chat_template else self.model.generate
 
-    async def query(self, prompt, generation_params: GenerationParameters) -> VLLMResponseWrapper:
+    async def query(self, prompt, generation_params: GenerationParameters,
+                    disable_reasoning_parser=False) -> VLLMResponseWrapper:
         if self.use_chat_template:
             prompt = normalize_chat_input(prompt)
 
@@ -78,10 +77,10 @@ class VLLMModel(Model):
         return VLLMResponseWrapper(response=response,
                                    n_logprobs=generation_params.logprobs if hasattr(generation_params,
                                                                                     'logprobs') else None,
-                                   reasoning_parser_mode=self.reasoning_parser_mode)
+                                   reasoning_parser_mode=self.reasoning_parser_mode if not disable_reasoning_parser else None)
 
     def close(self):
-        # TODO https://github.com/vllm-project/vllm/issues/1908
+        # https://github.com/vllm-project/vllm/issues/1908
         try:  # Note: try except necessary as different version of vllm provide different ways to close
             destroy_model_parallel()
         except Exception as e:

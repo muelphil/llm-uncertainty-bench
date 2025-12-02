@@ -1,51 +1,89 @@
 import inspect
 from abc import ABC, abstractmethod
-from typing import List, Dict, Union, Iterator, AsyncIterator, Tuple
+
+from typing import List, Dict, Union, Iterator, AsyncIterator, Tuple, Any
+
+Id = Union[int, str, Tuple[Union[int, str], ...]]
 
 
 class DataSource(ABC):
-    """
-    Abstract base class for data sources providing streaming access to datasets.
+    """Abstract base class for benchmark input data sources.
+
+    A `DataSource` provides streaming access to the input dataset used in a benchmark.
+    Each benchmark must have exactly one `DataSource`, which defines the items
+    that will flow through the computation graph.
+
+    Unlike regular nodes, a `DataSource` does not consume dependencies from other nodes.
+    Instead, it produces initial values that other nodes can depend on. Each item
+    produced must include a unique `"id"` and values for all keys declared in the
+    `provides` property.
     """
 
     @property
-    @abstractmethod
-    def stats(self) -> List[str]:
-        """
-        List of statistics or features provided by iter_items alongside an id.
+    def id(self) -> str:
+        """Return a unique identifier for the DataSource.
+
+        By default, this is the class name. Used to identify the
+        DataSource as a node in the benchmark graph.
 
         Returns:
-            List of stat names.
+            str: Unique DataSource identifier.
+        """
+        return self.__class__.__name__
+
+    @property
+    @abstractmethod
+    def provides(self) -> List[str]:
+        """List of features or statistics produced by this DataSource.
+
+        Every item yielded by `iter_items` must include values for
+        all keys in this list alongside a unique `"id"`.
+
+        Returns:
+            List[str]: Names of statistics or features provided.
         """
         pass
 
     @abstractmethod
     def __len__(self) -> int:
-        """
-        Return the length (number of items) of the dataset.
+        """Return the total number of items in the dataset.
+
+        This allows the benchmark framework to query dataset size
+        without iterating through all items.
 
         Returns:
-            Integer length of dataset.
+            int: Number of items in the dataset.
         """
         pass
 
     @abstractmethod
-    def iter_items(self) -> Union[Iterator[Dict[str, List[str]]], AsyncIterator[Dict[str, List[str]]]]:
-        """
-        Asynchronously iterate over items in the dataset.
+    def iter_items(self) -> Union[Iterator[Dict[str, Any]], AsyncIterator[Dict[str, Any]]]:
+        """Iterate over items in the dataset, yielding one at a time.
 
-        Each yielded item is a dictionary mapping feature/statistic names
-        to lists of string values (e.g., input_texts, target_texts).
+        Each yielded item is a dictionary containing:
+          * `"id"`: Unique identifier for the item (int, str, or tuple).
+          * One value per key listed in `provides`.
 
         Returns:
-            Sync or async iterator yielding dictionaries representing the data that is to be processed.
+            Iterator[Dict[str, Any]] or AsyncIterator[Dict[str, Any]]:
+                A synchronous or asynchronous iterator over dataset items.
         """
         pass
 
     @abstractmethod
-    def iter_keys(self) -> Iterator[Union[int, str, Tuple[Union[str, int], ...]]]:
+    def iter_ids(self) -> Iterator[Any]:
+        """Iterate over all unique item IDs without loading full items.
+
+        Useful for building indices and caches without consuming memory
+        by iterating the entire dataset.
+
+        Returns:
+            Iterator[Any]: Iterator over item identifiers.
+        """
         pass
 
+
+# TODO implement to_dataframe on DataSource
 
 class DataSourcePartitioner(DataSource):
     """
@@ -74,14 +112,14 @@ class DataSourcePartitioner(DataSource):
         self._end = end
 
     @property
-    def stats(self) -> List[str]:
-        return self._source.stats
+    def provides(self) -> List[str]:
+        return self._source.provides
 
     def __len__(self) -> int:
         return self._end - self._start
 
-    def iter_keys(self) -> Iterator[Union[int, str, Tuple[Union[str, int], ...]]]:
-        for i, key in enumerate(self._source.iter_keys()):
+    def iter_ids(self) -> Iterator[Id]:  # TODO rename iter_ids
+        for i, key in enumerate(self._source.iter_ids()):
             if self._start <= i < self._end:
                 yield key
 

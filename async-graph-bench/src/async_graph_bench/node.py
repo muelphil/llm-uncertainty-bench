@@ -1,18 +1,16 @@
-from typing import Protocol, List, Dict, Union, Optional, Any, Awaitable, TypeVar
-
-T = TypeVar("T")  # generic type for data (could be np.ndarray, list, tensor, etc.)
+from typing import Protocol, List, Dict, Union, Optional, Any, Awaitable
 
 
-class Node(Protocol[T]):
+class Node(Protocol):
     id: Optional[str]
-    dependencies: Optional[List[str]]
-    stats: List[str]
+    requires: Optional[List[str]]
+    provides: List[str]
     description: Optional[str]
     spread: Optional[bool]
 
-    def __call__(self, item_stats: Dict[str, T], **kwargs: Any) -> Union[
-        Dict[str, T],
-        T,
-        Awaitable[Union[Dict[str, T], T]]
+    def __call__(self, item_stats: Dict[str, List[Any]], **kwargs: Any) -> Union[
+        Dict[str, List[Any]],
+        Any,
+        Awaitable[Union[Dict[str, List[Any]], Any]]
     ]:
         ...

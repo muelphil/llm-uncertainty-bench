@@ -9,7 +9,7 @@ authors = []
 description = "A benchmarking toolkit for executing calculations within an asynchronous computation graph."
 readme = "README.md"
 
-keywords = ["benchmark", "reproducibility", "performance", "async", "workflow", "computation-graph", "scientific-computing", "evaluation", "profiling"]
+keywords = ["benchmark", "reproducibility", "performance", "async", "workflow", "computation-graph", "scientific-computing", "evaluation", "profiling", "large language models"]
 license = { file = "LICENSE.md" }
 
 requires-python = ">=3.10"
@@ -23,8 +23,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Testing :: Benchmark",
 ]
 

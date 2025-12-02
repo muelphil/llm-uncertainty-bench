@@ -17,24 +17,28 @@ def batching(generator, batch_size):
     """
     buffer = deque()
     lock = Lock()  # Ensures safe access to the buffer across multiple tasks
+    end_of_data_seen = False
 
     async def wrapped(item):
-        nonlocal buffer
+        nonlocal buffer, end_of_data_seen
 
         # Process incoming item
         if not isinstance(item, EndOfData):
+            assert end_of_data_seen is False, "Items were pushed to the batching layer after EndOfData signal was already seen"
             async with lock:
                 buffer.append(item)
 
         current_batch = None
-        async with lock:
+        async with (lock):
             # Process a full batch if buffer size meets or exceeds batch_size
             if len(buffer) >= batch_size:
                 current_batch = [buffer.popleft() for _ in range(batch_size)]
 
             # If EndOfData is received, process remaining items in the buffer
-            elif isinstance(item, EndOfData) and buffer:
-                current_batch = [buffer.popleft() for _ in range(len(buffer))]
+            elif isinstance(item, EndOfData):
+                end_of_data_seen = True
+                if buffer:
+                    current_batch = [buffer.popleft() for _ in range(len(buffer))]
 
         # Process the batch (outside the lock)
         if current_batch:

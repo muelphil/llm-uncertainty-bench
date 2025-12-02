@@ -38,7 +38,7 @@ def ease_out(x: float, k: float = 2.0) -> float:
 
 def plot_calibration_curve(bin_confidences, bucket_accuracies, bucket_counts, colormap="Blues",
                            title=None, ax=None, xlabel="Confidence Bins", ylabel="Accuracy in Bin",
-                           total_item_count=None, fontsize=18, tick_fontsize=12, count_fontsize=8):
+                           total_item_count=None, fontsize=18, tick_fontsize=12, count_fontsize=8, ece=None):
     """
     Plots a reliability diagram showing model calibration.
 
@@ -106,9 +106,10 @@ def plot_calibration_curve(bin_confidences, bucket_accuracies, bucket_counts, co
         ax.text(x, y, label, ha="center", va=va, fontsize=count_fontsize, color=color)
 
 
-    # # Display the ECE in the upper left corner
-    # ax.text(0.02, 0.98, f"Calibration Error:\n{ece:.4f}", transform=ax.transAxes, fontsize=12,
-    #         verticalalignment='top', horizontalalignment='left', color="black")
+    # Display the ECE in the upper left corner
+    if ece is not None:
+        ax.text(0.02, 0.98, f"ECE:\n{ece:.4f}", transform=ax.transAxes, fontsize=24,
+                verticalalignment='top', horizontalalignment='left', color="black")
 
     y_ticks = np.arange(0.2, 1.1, 0.2)
     # Labeling the axes and title

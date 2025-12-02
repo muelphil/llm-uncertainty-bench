@@ -1,32 +1,28 @@
 import gc
+import gc
 import logging
+import random
+import statistics
+import time
 import traceback
 from typing import List, Dict
 
-from tqdm import tqdm
+from async_graph_bench import CSVDataStore, DataSource, NodeConfig, SamplingConfig, BenchmarkManager, \
+    ResourcePool, visualize_graph
+from async_graph_bench.utils import BuilderEnvironment
 
-from async_graph_bench import CSVDataStore, DataSource, NodeConfig, SamplingConfig, BenchmarkManager, Node, \
-    visualize_graph
-
-
-class TqdmLoggingHandler(logging.Handler):
-    def emit(self, record):
-        # Format the record and write it using tqdm.write
-        msg = self.format(record)
-        tqdm.write(msg)
-
+log = logging.getLogger(__name__)
 
 logging.basicConfig(
     level=logging.INFO,  # Set the logging level
     format="%(asctime)s [%(name)s] %(message)s",  # Include the logger name in brackets
     datefmt="%H:%M:%S",  # Time format in HH:MM:SS
-    handlers=[TqdmLoggingHandler()]
 )
 
 
-class DummyDataSource(DataSource):
+class NumberTupleDataSource(DataSource):
     numbers = [(1, 2), (5, 3), (2, 4), (9, 1)]
-    stats = ["first_number", "second_number"]
+    provides = ["first_number", "second_number"]
 
     def iter_items(self):
         for idx, row in enumerate(self.numbers):
@@ -36,14 +32,11 @@ class DummyDataSource(DataSource):
                 "second_number": row[1]
             }
 
-    def iter_keys(self):
+    def iter_ids(self):
         return range(len(self.numbers))
 
     def __len__(self):
         return len(self.numbers)
-
-
-import random
 
 
 class DummyNoiseResource:
@@ -52,27 +45,28 @@ class DummyNoiseResource:
         self.stddev = stddev
 
     def generate_noise(self, length):
-        # time.sleep(1 + (length // 50))  # TODO simulating load, resource can take up to 50 items concurrently
+        time.sleep(1 + (length // 50))  # simulating load, resource can take up to 50 items concurrently
         return [self.rng.gauss(0.0, self.stddev) for _ in range(length)]
 
 
 class NoiseAdder:
-    description = "Adds noise to first number using DummyNoiseResource"
-    dependencies = ["first_number"]
-    stats = ["noisy_first_number"]
+    description = "Creates first_number_noisy by adding noise to first number using DummyNoiseResource"
+    requires = ["first_number"]
+    provides = ["first_number_noisy"]
 
     async def __call__(self, item_stats: Dict[str, List], resource: DummyNoiseResource) -> Dict[str, List]:
         first_numbers = item_stats["first_number"]
         noise = resource.generate_noise(len(first_numbers))
-        noisy_first_number = [x + n for x, n in zip(first_numbers, noise)]
+        first_number_noisy = [x + n for x, n in zip(first_numbers, noise)]
         return {
-            "noisy_first_number": noisy_first_number  # TODO
+            "first_number_noisy": first_number_noisy
         }
 
 
 class SquareCalculator:
-    dependencies = ["second_number"]
-    stats = ["second_number_squared"]
+    requires = ["second_number"]
+    provides = ["second_number_squared"]
+    description = "Creates second_number_squared by squaring the second number"
 
     def __call__(self, item_stats: Dict[str, list]) -> Dict[str, List]:
         second_numbers = item_stats["second_number"]
@@ -83,60 +77,79 @@ class SquareCalculator:
 
 
 class AdditionCalculator:
-    dependencies = ["noisy_first_number", "second_number_squared"]
-    stats = ["addition"]
+    requires = ["first_number_noisy", "second_number_squared"]
+    provides = ["sum"]
+    description = "Adds first_number_noisy to second_number_squared to create sum"
 
     async def __call__(self, item_stats: Dict[str, list]) -> Dict[str, List]:
-        first_summand = item_stats["noisy_first_number"]
+        first_summand = item_stats["first_number_noisy"]
         second_summand = item_stats["second_number_squared"]
-        addition = [a + b for a, b in zip(first_summand, second_summand)]
+        sum = [a + b for a, b in zip(first_summand, second_summand)]
         return {
-            "addition": addition
+            "sum": sum
         }
 
 
-import statistics
+# -------------------------- Sampling Nodes --------------------------
 
+class VarianceEstimator:
+    requires = ["sampled_sum"]
+    description = "Samples sum to determine the variance introduced by the noise"
 
-class DiffFromMeanSpread:
-    dependencies = ["sampled_score"]
-    spread = True  # <-- True
-
-    async def __call__(self, dependencies: Dict[str, list]) -> Dict[str, List]:
+    async def __call__(self, item_stats, **kwargs):
+        # raise ValueError("My funny error for testing purposes - in step 2")
         return {
-            "diff_from_mean": [
-                [abs(score - statistics.mean(sample)) for score in sample]
-                # <-- returning list of scores, one for each item in the sample batch
-                for sample
-                in dependencies["sampled_score"]
+            "variance": [
+                statistics.variance(sample)
+                for sample in item_stats["sampled_sum"]
             ]
         }
 
 
-class MySpreadEstimator(Node):
-    dependencies = ["sampled_addition"]
-    spread = True
+class DiffFromMeanEstimator:
+    requires = ["sampled_sum"]
+    description = "Samples sum to determine the difference per sum from the mean of sampled sums"
 
-    async def __call__(self, dependencies: Dict[str, list]) -> List:
-        sampled_addition = dependencies["sampled_addition"]
-        diff_from_mean = [
-            [x - (sum(inner) / len(inner)) for x in inner]
-            for inner in sampled_addition
-        ]
-        return {"diff_from_mean": diff_from_mean}
+    async def __call__(self, item_stats: Dict[str, list], **kwargs) -> Dict[str, List]:
+        # raise ValueError("My funny error for testing purposes - in step 1")
+        return {
+            "diff_from_mean": [
+                abs(sample[0] - statistics.mean(sample))
+                # sample is a list of additions, the first element belonging to the item, the rest to the sampled variations from other items
+                for sample
+                in item_stats["sampled_sum"]
+            ]
+        }
+
+
+class DiffFromMeanSpreadEstimator:
+    requires = ["sampled_sum"]
+    spread = True  # <-- spreading result across items in the sampling batch
+    description = "Samples sum to determine the difference per sum from the mean of sampled sums - using spread"
+
+    async def __call__(self, item_stats: Dict[str, list], **kwargs) -> Dict[str, List]:
+        return {
+            "diff_from_mean": [
+                [abs(addition - statistics.mean(sample)) for addition in sample]
+                # instead of returning a single result for a single item, return all results as a list for all sampled item in the sampling batch
+                # this effectively does the same as DiffFromMeanEstimator, but spreads the result across all sampled items, making it more efficient
+                # in scenarios where many items can be processed as a batch to compute the desired dependency
+                for sample
+                in item_stats["sampled_sum"]
+            ]
+        }
 
 
 NodeConfig.base_config = {"queue_size": 100, "prop_name": "estimations"}
 
 if __name__ == "__main__":
-    print("Running Benchmark")
-    data_source = DummyDataSource()
+    data_source = NumberTupleDataSource()
 
 
-    def build_noise_resource(env):
+    def build_noise_resource(env: BuilderEnvironment):
         if not hasattr(env, "noise_resource") or env.noise_resource is None:
             env.noise_resource = DummyNoiseResource()
-        return env.noise_resource
+        return ResourcePool([env.noise_resource])
 
 
     nodes = [
@@ -152,61 +165,52 @@ if __name__ == "__main__":
         AdditionCalculator()
     ]
 
+    iterations = 25
+
     consumer_nodes = [
         # in the consumer_nodes array, all NodeConfigs will receive greedy=True und data_store=CSVDataStore
         # you can also simply provide them in nodes with these parameters
         NodeConfig(
             VarianceEstimator(),
             always_recompute=True,
-            sampling_config=SamplingConfig(sampling_size=5),
-            batch_size=50
-        ),
-        NodeConfig(
-            VarianceEstimator(),
-            id="VarianceEstimator[extend]",
-            always_recompute=True,
-            sampling_config=SamplingConfig(sampling_size=5, all_variations=True),
+            sampling_config=SamplingConfig(sampling_size=iterations),
             step=2,
             batch_size=50
         ),
         NodeConfig(
-            MySpreadEstimator(),
+            DiffFromMeanEstimator(),
             always_recompute=True,
-            sampling_config=SamplingConfig(sampling_size=5),
+            sampling_config=SamplingConfig(sampling_size=iterations, all_variations=True),
+            batch_size=50
+        ),
+        NodeConfig(
+            DiffFromMeanSpreadEstimator(),
+            always_recompute=True,
+            sampling_config=SamplingConfig(sampling_size=iterations),
             batch_size=50
         ),
 
     ]
 
     man = BenchmarkManager(
-        iterations=5,
+        iterations=iterations,
         iterations_first=True,
         data_source=data_source,
         nodes=nodes,
         consumer_nodes=consumer_nodes,
         data_storage_path=f"data",
-        show_progress_bars=False,
-        halt_on_exception=True
+        show_progress_bars=True,
+        halt_on_exception=True,
+        raise_exceptions=True
     )
-    print("Created Manager")
-    visualize_graph(man.base_adg, to_pdf=True)
+    visualize_graph(man.base_adg, output_file_name="execution_graph", format="svg", show_descriptions=True)
     try:
-        result = man.run_benchmark()
-        print("Benchmarking finished!")
-        exceptions = [item for sublist in result["exceptions"].values() for item in sublist]
-        if exceptions:
-            message = 'Exceptions happened:' + str(exceptions)
-            print(message)
-        else:
-            print("Successfully finished")
+        man.run_benchmark()
     except Exception as e:
+        print("Execution halted due to exception: ", e)
         traceback.print_exc()
     finally:
-        visualize_graph(
-            man.runs[-1].adg,
-            to_pdf=True,
-            output_file="run_graph",
-            show_descriptions=True,
-            resolved_counts=man.runs[-1].resolved_at_start
-        )
+        report = man.get_report()
+        print(report.to_table())
+        report.write_csv_to_file("report.csv", extra_data={"Batch Size": 50})
         gc.collect()

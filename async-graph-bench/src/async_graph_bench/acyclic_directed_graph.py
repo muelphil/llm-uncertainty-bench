@@ -10,22 +10,23 @@ log = logging.getLogger(__name__)
 
 class AcyclicDirectedGraph:
     """
-    Represents an acyclic directed graph, featuring a data_source and nodes for calculation of statistics based on
-    dependencies. The graph is built based on dependencies required and statistics provided by the nodes.
+    Represents an acyclic directed graph, featuring a data_source and nodes for calculation of statistics (provided dependencies) based on
+    required dependencies. The graph is built based on dependencies required and statistics provided by the nodes.
     """
 
     def __init__(self, data_source: DataSource, node_configs: List[NodeConfig]):
         """
         Initializes the graph with a data source and a list of calculator/consumer nodes.
 
-        :param data_source: The single data source node with `stats` and `dependencies`.
+        :param data_source: The single data source node with.
         :param node_configs: A list of all calculator and consumer nodes as NodeConfig instances.
         """
         self.data_source: DataSource = data_source
         self.optional_nodes_configs: Set[NodeConfig] = {node for node in node_configs if not node.greedy}
         self.greedy_nodes_configs: Set[NodeConfig] = {node for node in node_configs if node.greedy}
-        self.edges: DefaultDict[Union[NodeConfig, DataSource], Set[NodeConfig]] = defaultdict(set)  # Adjacency list: producer → consumers
-        self.unreachable_nodes: Set[NodeConfig] = set()  # Nodes whose dependencies cannot be resolved
+        # Adjacency list: producer → consumers
+        self.edges: DefaultDict[Union[NodeConfig, DataSource], Set[NodeConfig]] = defaultdict(set)
+        self.unreachable_nodes: Set[NodeConfig] = set()  # Nodes whose required dependencies cannot be resolved
         self.pruned_nodes: Set[NodeConfig] = set()  # Nodes removed by treeshaking
         self.sampling: Dict[NodeConfig, Set] = defaultdict(lambda: set())
 
@@ -95,7 +96,7 @@ class AcyclicDirectedGraph:
         - Edges may be created from available provider nodes to predecessors to allow them to
           sample required dependencies, provided doing so does not create cycles.
         """
-        nodes = [self.data_source]  # already included/available producers
+        nodes: List[Union[DataSource, NodeConfig]] = [self.data_source]  # already included/available producers
         not_visited = self.optional_nodes_configs | self.greedy_nodes_configs
 
         changed = True
@@ -104,13 +105,13 @@ class AcyclicDirectedGraph:
             changed = False
             # iterate over a snapshot because we will mutate not_visited inside
             for consumer_node in list(not_visited):
-                required_dependencies = set(consumer_node.dependencies)
+                required_dependencies = set(consumer_node.requires)
                 # potential previous nodes that already provide some required deps
                 potential_previous_nodes: Set[NodeConfig] = set()
 
                 # find direct providers among currently added nodes
                 for producer_node in nodes:
-                    provided = set(producer_node.stats).intersection(required_dependencies)
+                    provided = set(producer_node.provides).intersection(required_dependencies)
                     if provided:
                         required_dependencies -= provided
                         potential_previous_nodes.add(producer_node)
@@ -154,7 +155,7 @@ class AcyclicDirectedGraph:
                 if not preds_with_first_mode:
                     for node in potential_previous_nodes:
                         predecessor_nodes = {node} | self.get_all_predecessors(node)
-                        predecessor_stats = {s for n in predecessor_nodes for s in n.stats}
+                        predecessor_stats = {s for n in predecessor_nodes for s in n.provides}
                         for base_dep in list(missing_sampling_base_deps):
                             if base_dep in predecessor_stats:
                                 missing_sampling_base_deps.remove(base_dep)
@@ -163,7 +164,7 @@ class AcyclicDirectedGraph:
                         for base_dep in list(missing_sampling_base_deps):
                             save_sources = self.get_safe_edge_sources(consumer_node)
                             for source in save_sources:
-                                if base_dep in source.stats:
+                                if base_dep in source.provides:
                                     potential_previous_nodes.add(source)
                                     added_deps[consumer_node].add(base_dep)
                                     missing_sampling_base_deps.remove(base_dep)
@@ -171,7 +172,6 @@ class AcyclicDirectedGraph:
                     if not missing_sampling_base_deps:
                         for node, deps_to_add in added_deps.items():
                             self.sampling[node].update(deps_to_add)
-                        nodes.append(consumer_node)
                         self.sampling[consumer_node].update(sampling_base_deps)
                         for producer_node in potential_previous_nodes:
                             self.edges[producer_node].add(consumer_node)
@@ -199,7 +199,7 @@ class AcyclicDirectedGraph:
 
                     for node in preds_with_first_mode:
                         predecessor_nodes = self.get_all_predecessors(node)
-                        predecessor_stats = {n.stats for n in predecessor_nodes}
+                        predecessor_stats = {n.provides for n in predecessor_nodes}
                         for base_dep in list(missing_sampling_base_deps):
                             # if base_dep accessible by node add it
                             if base_dep in predecessor_stats:
@@ -212,7 +212,7 @@ class AcyclicDirectedGraph:
                             for base_dep in list(missing_sampling_base_deps):
                                 save_sources = self.get_safe_edge_sources(node)
                                 for source in save_sources:
-                                    if base_dep in source.stats:
+                                    if base_dep in source.provides:
                                         # self.edges[source].add(node)
                                         added_edges.append((source, node))
                                         # sampling[node]["deps"].add(base_dep)
@@ -235,8 +235,8 @@ class AcyclicDirectedGraph:
                 # compute missing dependencies for logging purposes
                 present_deps = set()
                 for n in nodes:
-                    present_deps.update(getattr(n, "stats", []))
-                missing_dependencies = set(consumer.dependencies) - present_deps
+                    present_deps.update(getattr(n, "provides", []))
+                missing_dependencies = set(consumer.requires) - present_deps
                 log.warning(
                     f'Removed unreachable consumer {consumer.id} due to missing required dependencies. '
                     f'(Missing Dependencies: {missing_dependencies}, Present Dependencies: {present_deps})'
@@ -253,9 +253,9 @@ class AcyclicDirectedGraph:
         if not self.unreachable_nodes:
             log.info("All nodes are reachable.")
         else:
-            log.warning("Unreachable nodes due to unmet dependencies:")
+            log.warning("Unreachable nodes due to unmet required dependencies:")
             for node in self.unreachable_nodes:
-                log.warning(f" - {node.id} (Dependencies: {node.dependencies})")
+                log.warning(f" - {node.id} (Required Dependencies: {node.requires})")
 
     def turn_consumer_non_greedy(self, consumer: NodeConfig) -> None:
         """
@@ -424,14 +424,16 @@ class AcyclicDirectedGraph:
         Traverse from data_source in breadth-first order and return:
           - all optional+greedy nodes in dependency-respecting order
           - all edges (from, to) in traversal order (parent edges before child edges).
+        Will always return the nodes in the same order for the same graph, regardless of the order that the nodes were added.
         """
         all_nodes = self.optional_nodes_configs | self.greedy_nodes_configs
         seen, nodes, edges = set(), [], []
-        queue = deque([self.data_source])
+        queue: deque[Union[DataSource, NodeConfig]] = deque([self.data_source])
 
         while queue:
             node = queue.popleft()
-            for child in self.edges.get(node):
+            children = sorted(self.edges.get(node, []), key=lambda n: n.id)  # sorted for deterministic order
+            for child in children:
                 edges.append((node, child))
                 if child not in seen:
                     seen.add(child)

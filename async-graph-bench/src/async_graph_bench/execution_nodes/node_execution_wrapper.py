@@ -2,7 +2,6 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Union, AsyncIterator
 
-from ..node import Node
 from ..node_config import NodeConfig
 from ..utils.end_of_data import EndOfData
 
@@ -21,10 +20,10 @@ class NodeExecutionWrapper:
 
     Args:
         node: The node instance to execute. Must have a callable interface and a
-              `dependencies` property, and optionally a `stats` property.
+              `requires` property, and optionally a `provides` property.
     """
 
-    def __init__(self, node: Node):
+    def __init__(self, node):
         self.node = node
 
     async def run_node(
@@ -40,11 +39,11 @@ class NodeExecutionWrapper:
             Either a dict of lists (for intermediate nodes) or a list of final results.
         """
         combined_items = dict()
-        for key in self.node.dependencies:
+        for key in self.node.requires:
             combined_items[key] = []
 
         for item in items:
-            for key in self.node.dependencies:
+            for key in self.node.requires:
                 combined_items[key].append(item[key])
 
         if asyncio.iscoroutinefunction(self.node.__call__):
@@ -57,15 +56,15 @@ class NodeExecutionWrapper:
             items: Union[Dict[str, Any], List[Dict[str, Any]], EndOfData],
             *args,
             **kwargs
-    ) -> AsyncIterator[Dict[str, Any]]:
+    ) -> AsyncIterator[Union[Dict[str, Any], EndOfData]]:
         """
         Executes the wrapped node and yields processed items.
 
         Handles EndOfData signaling and distinguishes between intermediate and
-        consumer nodes based on the presence of a `stats` attribute.
+        consumer nodes based on the presence of a `provides` attribute.
         """
         if isinstance(items, EndOfData):
-            log.info(f"{self.node.__class__.__name__} received end of data signal...")
+            log.debug(f"{self.node.__class__.__name__} received end of data signal...")
             yield items
             return
 
@@ -74,7 +73,7 @@ class NodeExecutionWrapper:
 
         results = await self.run_node(items, *args, **kwargs)
 
-        if hasattr(self.node, 'stats'):  # intermediate node
+        if hasattr(self.node, 'provides'):  # intermediate node
             for key, value in results.items():
                 assert len(value) == len(items), f"Length mismatch! len(value)={len(value)}, len(items)={len(items)}"
 
@@ -92,7 +91,7 @@ class NodeExecutionWrapper:
                         to_serialize["iter"] = item["iter"]
                     for key, value in results.items():
                         to_serialize[key] = value[idx]
-                        yield to_serialize
+                    yield to_serialize
             else:
                 result_prop_identifier = (NodeConfig.base_config or {}).get("prop_name", "value")
                 for i in range(len(results)):

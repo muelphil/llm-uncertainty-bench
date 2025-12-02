@@ -1,6 +1,4 @@
 import math
-import numpy as np
-from typing import Dict
 import re
 
 WHITESPACE_TOKENS_REGEX = re.compile(r"[Ġ▁Ċ▂▃\s]")
@@ -25,19 +23,22 @@ def get_token_probabilities(alternatives, tokens):
 
 
 class LabelProbExtractor:
-    dependencies = ["greedy_tokens_decoded_alternatives"]
+    requires = ["greedy_tokens_decoded_alternatives", "amount_answer_tokens", "finish_reason"]
 
     def __call__(self, stats):
         alternatives_per_choice = stats["greedy_tokens_decoded_alternatives"]
+        finish_reasons = stats["finish_reason"]
 
         confidence_per_choice = []
-        for alternatives in alternatives_per_choice:
-            if len(alternatives) == 0:
+        for alternatives, reason in zip(alternatives_per_choice, finish_reasons):
+            if len(alternatives) == 0 or reason == 'length':
                 confidence_per_choice.append([0, 0, 0, 0])
             else:
                 first_token = alternatives[0]
                 confidence_per_choice.append(get_token_probabilities(first_token, ["A", "B", "C", "D"]))
 
         return {
-            "confidence_per_choice": confidence_per_choice
+            "confidence_per_choice": confidence_per_choice,
+            "amount_answer_tokens": stats["amount_answer_tokens"],
+            "finish_reason": finish_reasons
         }

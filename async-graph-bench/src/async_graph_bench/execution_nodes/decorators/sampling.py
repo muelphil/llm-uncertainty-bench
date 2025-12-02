@@ -7,13 +7,39 @@ from ...utils.end_of_data import EndOfData
 
 def sampling(
         generator: Callable,  # async generator function to wrap (async def g(item): ...)
-        dependencies: Iterable[str],  # dependencies to sample (e.g. ["dep1", "dep2"])
+        dependencies: Iterable[str],  # required dependencies to sample (e.g. ["dep1", "dep2"])
         sample_size: int,  # number of iterations per sample
         total_iterations: int,  # total iterations per id (must be divisible by sample_size)
         mode: str = "first",  # "first" | "spread" | "extend"
         spread_keys: Optional[Union[List[str], "all"]] = None,  # required if mode == "spread"
         # flush_incomplete: bool = False  # if True, flush incomplete samples on EndOfData
 ):
+    """
+    Wraps an async generator to provide sampled dependencies for items grouped by `id`.
+
+    Sampling groups multiple iterations of the same item together. The resulting
+    items include additional keys for the sampled dependencies, allowing nodes
+    to compute statistics over a batch of iterations.
+
+    Args:
+        generator: Async generator function to wrap. Receives items with sampled dependencies.
+        dependencies: List of dependency keys to sample and extend.
+        sample_size: Number of iterations per sample batch.
+        total_iterations: Total iterations per item. Must be divisible by `sample_size`.
+        mode: Sampling mode:
+            - "first": Only the first item of each batch is extended (default).
+            - "extend": All items in the batch are extended, with rotated dependencies.
+            - "spread": Single output per batch is spread across all items. Requires `spread_keys`.
+        spread_keys: Keys to spread in "spread" mode, or "all" to spread all keys.
+
+    Returns:
+        Wrapped async generator that yields items with sampled dependencies applied.
+
+    Notes:
+        - Only dependencies prefixed with `sampled_` are sampled.
+        - Groups are keyed by `id` and iteration index.
+        - In "spread" mode, nodes must return lists of length `sample_size` for the spread keys.
+    """
     assert mode in ("first", "spread", "extend"), "mode must be one of 'first','spread','extend'"
     if mode == "spread":
         assert spread_keys is not None and spread_keys == "all" or len(

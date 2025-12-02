@@ -39,7 +39,7 @@ class DataSourceExecutionWrapper:
             iterations: int = 1,
             iterations_first: bool = True
     ):
-        self.data_source = data_source
+        self.data_source_gen = data_source
         self.iterations = iterations
         self.iterations_first = iterations_first
 
@@ -54,14 +54,14 @@ class DataSourceExecutionWrapper:
         counter = 0  # Provides unique integer ID for each emitted item
 
         if self.iterations == 1:
-            source_iter = await _ensure_async(self.data_source())
+            source_iter = await _ensure_async(self.data_source_gen())
             async for item in source_iter:
                 item['_idx'] = counter
                 counter += 1
                 yield item
 
         elif self.iterations_first:
-            source_iter = await _ensure_async(self.data_source())
+            source_iter = await _ensure_async(self.data_source_gen())
             async for item in source_iter:
                 for i in range(self.iterations):
                     item_i = item.copy()
@@ -74,7 +74,7 @@ class DataSourceExecutionWrapper:
             for i in range(self.iterations):
                 # Note: THIS MAY NOT BE MOVED OUTSIDE THE LOOP !!!!
                 # iterators may only be used once -> for additional runs, the iterator needs to be created again!
-                source_iter = await _ensure_async(self.data_source())
+                source_iter = await _ensure_async(self.data_source_gen())
                 async for item in source_iter:
                     item_i = item.copy()
                     item_i['_idx'] = counter

@@ -1,22 +1,38 @@
 import gc
 import logging
 import os
-from typing import Any, List, Dict, Callable, Optional, Set
+from typing import Callable, Union
+from typing import Dict, Optional
 
-from async_graph_bench import acyclic_directed_graph
-
+from async_graph_bench.utils import ExceptionInfo
 from .acyclic_directed_graph import AcyclicDirectedGraph
 from .benchmark_run import BenchmarkRun
 from .data_source import DataSource
 from .node_config import NodeConfig
-from .stores import DataStore, CSVDataStore
-from .utils.helpers import check_unique_strings, get_metadata, update_metadata, clear_metadata
-import time
+from .report import BenchmarkReport
+from .stores import CSVDataStore
+from .utils.helpers import *
 
 log = logging.getLogger(__name__)
 
+NodeState = Union["pruned", "unreachable", "active"]
+BenchmarkState = Union["pending", "finished", "crashed", "skipped"]
+
 
 class BenchmarkManager:
+    """Orchestrates the setup, validation, and execution of benchmark workflows.
+
+    The BenchmarkManager coordinates multiple computational nodes arranged
+    in a directed acyclic graph (ADG). Each node represents a distinct
+    calculation step with defined dependencies and outputs.
+
+    Responsibilities include:
+      * Building and validating the dependency graph between nodes.
+      * Managing data stores and caching across runs.
+      * Executing one or more BenchmarkRuns in correct step order.
+      * Handling exceptions, reporting, and benchmark state tracking.
+    """
+
     def __init__(
             self,
             data_source: DataSource,
@@ -25,14 +41,30 @@ class BenchmarkManager:
             consumer_nodes: Optional[List[NodeConfig | Callable]] = None,
             show_progress_bars: bool = True,
             halt_on_exception: bool = True,
+            raise_exceptions: bool = True,
             iterations: int = 1,
             iterations_first: Optional[bool] = None,
     ):
+        """Initializes a BenchmarkManager instance.
+
+        Args:
+            data_source: The input data provider for the benchmark.
+            nodes: List of computational nodes or callables forming the main graph.
+            data_storage_path: Root path for caching intermediate and final results.
+            consumer_nodes: Optional greedy or output nodes for evaluation.
+            show_progress_bars: Whether to display progress bars during execution.
+            halt_on_exception: If True, stops execution when an exception occurs.
+            raise_exceptions: If True, raises exceptions instead of storing them.
+            iterations: Number of iterations to execute per benchmark run.
+            iterations_first: Whether iteration order precedes sampling order.
+        """
         self.data_source: DataSource = data_source
         self.iterations: int = iterations
         self.iterations_first: bool = iterations_first
         self.halt_on_exception: bool = halt_on_exception
+        self.raise_exceptions = raise_exceptions
         self.show_progress_bars: bool = show_progress_bars
+        self.exceptions: List[ExceptionInfo] = []
 
         self.data_storage_path: str = os.path.abspath(data_storage_path)
         self.store_per_node: Dict[str, DataStore] = dict()
@@ -40,9 +72,6 @@ class BenchmarkManager:
         self.node_configs: List[NodeConfig] = []
         self.runs: List[BenchmarkRun] = []
         # self.resources: Set = set()
-
-        if not hasattr(self.data_source, "id"):
-            self.data_source.id = self.data_source.__class__.__name__
 
         if not os.path.exists(self.data_storage_path):
             os.makedirs(self.data_storage_path)
@@ -115,9 +144,31 @@ class BenchmarkManager:
             self.iterations_first = any(node.is_sampling() for node in
                                         self.base_adg.optional_nodes_configs | self.base_adg.greedy_nodes_configs)
 
+        duplicates = get_duplicates(self.data_source.iter_ids())
+        if len(duplicates):
+            raise AssertionError(f"Duplicate IDs in provided DataSource. Duplicate IDs found: {duplicates}")
+
+        # Build combined ids for this run
+        all_ids = build_combined_keys(
+            self.data_source.iter_ids(),
+            iterations=self.iterations,
+            iterations_first=self.iterations_first
+        )
+        self.data_source_item_index: Dict[Tuple, int] = {  # TODO a hashlist may be more appropriate/ efficient
+            item_id: index
+            for index, item_id
+            in enumerate(all_ids)
+        }
+
     def _prepare_adg_for_step(self, step: int) -> AcyclicDirectedGraph:
-        """
-        Returns a copy of base_adg for this step and deactivates nodes whose NodeConfig.step > step.
+        """Prepares a step-specific ADG by deactivating nodes not relevant to the step.
+
+        Args:
+            step: The benchmark step number to prepare.
+
+        Returns:
+            AcyclicDirectedGraph: A step-filtered copy of the base ADG containing only
+            nodes active for the given step.
         """
         adg_copy = self.base_adg.copy()
         # Deactivate nodes that should not be active in this step
@@ -126,9 +177,14 @@ class BenchmarkManager:
                 adg_copy.remove_node(cfg)
         return adg_copy
 
-    def run_benchmark(self) -> Dict[str, Any]:
+    def run_benchmark(self):
+        """Executes the full benchmark workflow across all configured steps.
+
+        For each step, prepares a step-specific ADG, deactivates irrelevant nodes,
+        and launches a corresponding BenchmarkRun. Results and exceptions are collected
+        after each step. Subsequent steps are aborted if any exception occurs.
+        """
         assert len(self.runs) == 0, "Cannot rerun same benchmark instance!"
-        aggregated_exceptions = {}
         last_stores = self.store_per_node
 
         for step in range(1, self.total_steps + 1):
@@ -142,79 +198,64 @@ class BenchmarkManager:
                 data_source=self.data_source,
                 iterations=self.iterations,
                 iterations_first=self.iterations_first,
+                data_source_item_index=self.data_source_item_index,
                 store_per_node=self.store_per_node,
                 data_storage_path=self.data_storage_path,
                 show_progress_bars=self.show_progress_bars,
                 halt_on_exception=self.halt_on_exception,
+                raise_exceptions=self.raise_exceptions
             )
             run.init_graph()
             self.runs.append(run)
 
             try:
-                result = run.run()
-                # self.resources.update(run.resources)
-            except Exception:  # TODO this should be put into the exceptions still and returned, not raised - raising it will interrupt and in run.py the report will never be printed
-                log.exception(f"Exception during benchmark run at step {step}; aborting subsequent steps.")
-                raise
-            else:  # try block succeeded
-                aggregated_exceptions.update(result.get("exceptions", {}))
-                last_stores = result.get("stores", last_stores)
+                if self.show_progress_bars or log.getEffectiveLevel() <= logging.INFO:
+                    title = f" Running Benchmark Step {step}/{self.total_steps} "
+                    bar = "═" * len(title)
+                    print(f"\n╔{bar}╗\n║{title}║\n╚{bar}╝\n")
+                run.run()
+                for exception in run.exceptions:
+                    self.exceptions.append(
+                        ExceptionInfo(exception.exception, exception.originator, step=step)
+                    )
+                if self.exceptions:
+                    print(f"Exception during benchmark run at step {step}; aborting subsequent steps.")
+                    if self.raise_exceptions:
+                        raise ExceptionGroup(
+                            "Exception during benchmark run at step {step}; aborting subsequent steps.",
+                            [exc.exception for exc in self.exceptions]
+                        )
+                    else:
+                        break  # don't execute subsequent steps if this one resulted in an error
+                else:
+                    print(f"Finished benchmark run at step {step} - run state: {run.state}")
+            finally:
+                gc.collect()  # force garbage collection
 
-            gc.collect()  # force garbage collection
+    def get_node_state(self, node, adg) -> NodeState:
+        """Determines the execution state of a node within a given ADG.
 
-        return {"exceptions": {k: v for k, v in aggregated_exceptions.items() if v}, "stores": last_stores}
+        Args:
+            node: The NodeConfig or node ID to inspect.
+            adg: The ADG instance containing the node.
 
-    def get_node_state(self, node, adg):
+        Returns:
+            str: One of "active", "pruned", or "unreachable".
+        """
         return "pruned" if node in adg.pruned_nodes else "unreachable" if node in adg.unreachable_nodes else "active"
 
-    def get_formatted_report(self):
-        """
-        Node 		Initial			Step 1 (finished, 1h:5min)			Step2(crashed, 1h:5min)		  End      Delta
-        NodeName	0				54							        100				  		               100
-        NodeName2	10				pruned						        100				   		                 90
-        NodeName3	unreachable 	unreachable					        100				    	                0
-        """
-        report_data = self.get_report()
-        total_time = time.strftime("%H:%M:%S", time.gmtime(report_data["total_time"]))
-        end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(report_data["finish_time"])) if report_data[
-                                                                                                         "finish_time"] is not None else None
-        result = f"Benchmark {report_data['state']}{' ' + end_time if end_time is not None else ''} ({len(report_data['run_states'])}/{self.total_steps} steps initiated, total runtime: {total_time})\n"
-        is_pending = report_data["state"] == "pending"
-        table_header = [
-            "Node",
-            "Initial", *[
-                f"Step {run_idx} ({state}, {time.strftime('%H:%M:%S', time.gmtime(run_time))})"
-                for run_idx, (state, run_time) in
-                enumerate(zip(report_data['run_states'], report_data['step_times']))
-            ]
-        ]
-        if not is_pending:
-            table_header += ["End", "Delta"]
-        table = [table_header]
-        for node_id, node_report_data in report_data["nodes"].items():
-            row = [
-                node_id,
-                node_report_data["start_count"],
-                *[(count if state == "active" else state)
-                  for count, state in
-                  zip(node_report_data["step_counts"], node_report_data["step_states"])],
-            ]
-            if not is_pending:
-                row += [
-                    node_report_data["end_count"],
-                    node_report_data["end_count"] - node_report_data["start_count"]
-                ]
-            table.append(row)
-        # Convert to strings
-        table = [[str(c) for c in row] for row in table]
-        # Compute widths
-        widths = [max(map(len, col)) + 2 for col in zip(*table)]
+    def get_state(self) -> BenchmarkState:
+        """Returns the current overall benchmark state.
 
-        for row in table:
-            result += ("".join(cell.ljust(w) for cell, w in zip(row, widths))) + "\n"
-        return result
+        Possible states:
+          * "pending" — Not yet executed or in progress.
+          * "finished" — All steps completed successfully.
+          * "skipped" — All steps skipped due to fully resolved caches.
+          * "crashed" — One or more steps failed with exceptions.
 
-    def get_state(self):
+        Returns:
+            str: The global benchmark state.
+        """
         if any(run.state == "crashed" for run in self.runs):
             return "crashed"
         if len(self.runs) == self.total_steps:
@@ -225,52 +266,13 @@ class BenchmarkManager:
                 return "finished"
         return "pending"
 
-    def get_report(self):
-        end_stores = self.store_per_node
-        # TODO this depends on base_adg being present -
-        state = self.get_state()
-        step_times = [run.elapsed if run.state in ["finished", "crashed"] else 0 for run in self.runs]
-        report_data = {
-            "state": state,  # TODO
-            "run_states": [run.state for run in self.runs],
-            "total_time": sum(step_times),
-            "step_times": step_times,
-            "finish_time": next((run.end_time for run in reversed(self.runs) if hasattr(run, "end_time")), None),
-            "nodes": {},
-        }
-        all_nodes = (
-            # {man.base_adg.data_source}|
-                self.base_adg.optional_nodes_configs
-                | self.base_adg.greedy_nodes_configs
-                | self.base_adg.unreachable_nodes
-                | self.base_adg.pruned_nodes
-        )
+    def get_report(self) -> BenchmarkReport:
+        """Generates and returns a summary report for the completed benchmark.
 
-        for node in all_nodes:
-            base_state = self.get_node_state(node, self.base_adg)
-            step_states = [
-                self.get_node_state(node, run.adg)
-                for run in self.runs
-            ]
+        Includes runtime statistics, node-level performance data,
+        and exception summaries for post-execution analysis.
 
-            start_count = next(
-                (run.resolved_at_start[node.id][0] for run in self.runs if node.id in run.resolved_at_start),
-                0) if len(self.runs) == self.total_steps else len(
-                self.store_per_node[node.id]) if node.id in self.store_per_node else 0
-            end_count = len(self.store_per_node[node.id]) if node.id in self.store_per_node else start_count
-
-            step_counts = [
-                run.resolved_at_start[node.id][0] if node.id in run.resolved_at_start else None
-                for run in self.runs
-            ]
-            step_counts.append(end_count)
-
-            report_data["nodes"][node.id] = {
-                "base_state": base_state,
-                "step_states": step_states,
-                "start_count": start_count,
-                "end_count": end_count,
-                "step_counts": step_counts,
-            }
-
-        return report_data
+        Returns:
+            BenchmarkReport: A structured report object containing benchmark metrics.
+        """
+        return BenchmarkReport(self)

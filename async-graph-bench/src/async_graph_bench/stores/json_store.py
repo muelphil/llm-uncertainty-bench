@@ -1,92 +1,53 @@
 import json
-import os
-from collections import defaultdict
-from typing import Any, Optional, Iterator, Tuple
+from typing import Optional
 
-import pandas as pd
+from .in_memory_store import InMemoryStore
 
-from .store import DataStore
-from .combined_id import get_combined_id
+def encode_tuples(obj):
+    if isinstance(obj, tuple):
+        return {"__tuple__": True, "items": [encode_tuples(x) for x in obj]}
+    elif isinstance(obj, list):
+        return [encode_tuples(x) for x in obj]
+    elif isinstance(obj, dict):
+        return {k: encode_tuples(v) for k, v in obj.items()}
+    else:
+        return obj
+
+def decode_tuples(obj):
+    if isinstance(obj, dict) and "__tuple__" in obj:
+        return tuple(decode_tuples(x) for x in obj["items"])
+    elif isinstance(obj, list):
+        return [decode_tuples(x) for x in obj]
+    elif isinstance(obj, dict):
+        return {k: decode_tuples(v) for k, v in obj.items()}
+    else:
+        return obj
 
 
-class JSONDataStore(DataStore):
-    def __init__(self, directory: str, filename: str, flush_every: Optional[int] = None):
-        self.directory = directory
-        self.filepath = os.path.join(directory, f"{filename}.json")
-        self.flush_every = flush_every
-        self.data = []
-        self.modified_count = 0
-        self._initialize()
 
-    def _initialize(self):
-        os.makedirs(self.directory, exist_ok=True)
-        if os.path.exists(self.filepath):
-            with open(self.filepath, mode='r', encoding='utf-8') as f:
-                self.data = json.load(f)
+class JSONDataStore(InMemoryStore):
+    def __init__(self, directory: str, filename: str, flush_every: Optional[int] = None, create_okay: bool = False):
+        super().__init__(directory, filename, flush_every, create_okay)
+        self.filepath = self.directory / f"{filename}.json"
+        self.directory.mkdir(parents=True, exist_ok=True)
 
-    def save(self, item: dict):
-        for i, saved_item in enumerate(self.data):
-            if saved_item["id"] == item["id"] and saved_item.get("iter", 0) == item.get("iter", 0):
-                self.data[i] = item  # Replace existing item
-                return
+        if not self.create_okay and not self.filepath.exists():
+            raise FileNotFoundError(f"Cache file {self.filepath} does not exist and create_okay is set to False.")
 
-        self.data.append(item)
-        self.modified_count += 1
-        if self.flush_every and self.modified_count >= self.flush_every:
-            self.flush()
+        if self.filepath.exists():
+            self._load_from_file()
 
-    def delete(self, id: Any, iteration=0) -> bool:
-        for i, saved_item in enumerate(self.data):
-            if saved_item["id"] == id and saved_item.get("iter", 0) == iteration:
-                del self.data[i]
-                self.modified_count += 1
-                if self.flush_every and self.modified_count >= self.flush_every:
-                    self.flush()
-                return True
-        return False
+    def _load_from_file(self):
+        with self.filepath.open(mode="r", encoding="utf-8") as f:
+            self.data =decode_tuples(json.load(f))
 
-    def contains_id(self, id: Any, iteration=0) -> bool:
-        return any(entry["id"] == id and entry.get("iter", 0) == iteration for entry in self.data)
+    def _write_to_file(self):
+        with self.filepath.open(mode="w", encoding="utf-8") as f:
+            json.dump(encode_tuples(self.data), f, indent=4,)
 
-    def load(self, id: Any, iteration=0) -> dict:
-        for entry in self.data:
-            if entry["id"] == id and entry.get("iter", 0) == iteration:
-                return entry
-        return None
-
-    def to_dataframe(self, properties=None):
-        df = pd.DataFrame(self.data)
-        return df[properties] if properties else df
-
-    def flush(self):
-        with open(self.filepath, mode='w', encoding='utf-8') as f:
-            json.dump(self.data, f, indent=4)
-        self.modified_count = 0
-
-    def get_length_per_iteration(self):
-        lengths_per_iteration = defaultdict(int)
-        for item in self.data:
-            lengths_per_iteration[item.get("iter", 0)] += 1
-        return lengths_per_iteration
-
-    def iter_indices(self) -> Iterator[Tuple[int, int]]:
-        for entry in self.data:
-            yield get_combined_id(entry)
-
-    def clear(self):
-        if os.path.exists(self.filepath):
-            os.remove(self.filepath)
-        self.data = []
-        self.modified_count = 0
-
-    def __len__(self):
-        return len(self.data)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.flush()
+    def _remove_file(self):
+        if self.filepath.exists():
+            self.filepath.unlink()
 
     def __str__(self):
         return f"JSONDataStore(filepath={self.filepath})"

@@ -1,6 +1,5 @@
 from bitarray import bitarray
 
-from ...stores import get_combined_id
 from ...utils.end_of_data import EndOfData
 
 
@@ -41,7 +40,8 @@ def skip_indices_data_source(item_source, indices_to_skip: bitarray):
 
         # If the item is not in the skip set, continue processing
         async for item in item_source():
-            if not isinstance(item, EndOfData) and indices_to_skip[item.get('_idx')]:
+            if not isinstance(item, EndOfData) and item.get('_idx') < len(indices_to_skip) and indices_to_skip[
+                item.get('_idx')]:  # _idx is individual for every single item TODO review this logic
                 continue
             yield item
 

@@ -7,7 +7,7 @@ from .split_dataframe import split_dataframe
 
 
 class MultipleChoiceDataSource(DataSource):
-    stats = ["questions", "options", "selected_options", "correct_answer"]
+    provides = ["questions", "options", "selected_options", "correct_answer"]
 
     def __init__(self, df, choice_length=4, subset: tuple = None, limit_items=None):
         """
@@ -51,7 +51,7 @@ class MultipleChoiceDataSource(DataSource):
     def __len__(self):
         return len(self.df) * self.choice_length
 
-    def iter_keys(self):
+    def iter_ids(self):
         items = self.df
         for idx, row in items.iterrows():
             choices = row['choices']

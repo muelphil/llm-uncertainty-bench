@@ -1,24 +1,25 @@
 # Overview
 
 The `async_graph_bench` framework provides a flexible, modular way to design and run benchmarks as **directed acyclic
-graphs (DAGs)**. Each computation is encapsulated in a **node** that defines its required inputs (
-`dependencies`) and produces outputs that can then be used by other nodes. The framework manages execution order, resource scheduling, and caching automatically.
+graphs (DAGs)**. It is designed for multistep computations, where intermediate computation steps are encapsulated by a
+[`Node`](./api/node.md) that defines its required and provided dependencies. The framework manages execution order, resource scheduling, and caching automatically.
 
 ## Core Concepts
 
 * **Graph-Based Execution**
 
-    * The benchmark manager builds a **directed acyclic graph (DAG)** of nodes based on their declared dependencies.
+    * The [`BenchmarkManager`](./api/benchmarkmanager.md) builds a **directed acyclic graph (DAG)** of nodes based on their declared dependencies.
     * Each node represents a calculation, transformation, or metric applied to incoming data.
     * The graph ensures results are computed in the correct order and reused where possible.
 
 * **Asynchronous Execution**
 
-    * Nodes are executed asynchronously, allowing the framework to make efficient use of parallel and external resources (e.g., GPUs, APIs, or databases).
+    * Nodes are executed asynchronously, allowing the framework to make efficient use of external resources (e.g., GPUs, APIs, or databases).
+    * Although mainly designed for concurrent programming, custom resources using multiprocessing can be leveraged to run computations in parallel locally.
 
 * **Data Flow**
 
-    * A **data source** emits items (Python `dict`s).
+    * A [`DataSource`](./api/datasource.md) emits items (Python `dict`s).
     * These items travel through the graph and are progressively extended with additional dependencies computed by nodes.
 
 * **Stepwise Execution**
@@ -35,8 +36,7 @@ graphs (DAGs)**. Each computation is encapsulated in a **node** that defines its
 
     * Nodes can be extended with optional features such as:
 
-        * **Caching/Result persistence
-          **: Caching of outputs from nodes, which may be reused across benchmark runs to avoid redundant computation.
+        * **Caching/Result persistence**: Caching of outputs from nodes, which may be reused across benchmark runs to avoid redundant computation.
         * **Batching**: Process items in groups for efficiency when working with expensive resources.
 
 ---
@@ -48,7 +48,7 @@ The framework was originally motivated by **scientific benchmarking of LLM uncer
 
 * **Modular & Extensible**
 
-    * Each node is independent and easily replaceable, enabling reproducible and flexible benchmarking pipelines.
+    * Each node is independent and easily replaceable, enabling extensible and flexible benchmarking pipelines.
 
 * **Scalable & Efficient**
 
@@ -58,7 +58,7 @@ The framework was originally motivated by **scientific benchmarking of LLM uncer
 * **Transparent Caching Layer**
 
     * Intermediate results are automatically cached, loaded, and reused.
-    * Caching is configurable but requires minimal effort from the user.
+    * Caching is configurable and requires minimal effort from the user.
 
 * **Preservation of Intermediate Outputs**
 
@@ -78,6 +78,5 @@ The framework was originally motivated by **scientific benchmarking of LLM uncer
 ## Notes on Documentation
 
 * Examples in this documentation will be intentionally **simplified** for clarity.
-* The actual framework was designed for **uncertainty estimation in large-scale, resource-intensive settings
-  ** (e.g., large language model evaluation).
+* The actual framework was designed for **uncertainty estimation in large-scale, resource-intensive settings** (e.g., large language model evaluation).
 * However, the same principles apply to smaller, general-purpose benchmarking tasks.

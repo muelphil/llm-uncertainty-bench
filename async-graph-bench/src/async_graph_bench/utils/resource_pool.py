@@ -1,5 +1,8 @@
 import asyncio
-from typing import Any, Iterable, List, Optional, Tuple, Union
+import inspect
+from typing import Any, Iterable, List, Optional, Tuple, Union, Callable, Awaitable
+
+ResourceCloseFunc = Union[Callable[[], None], Callable[[], Awaitable[None]]]
 
 
 class ResourceHandle:
@@ -28,66 +31,120 @@ class ResourceHandle:
         # Put back each resource. We use put_nowait as a fast path;
         # if that fails (rare), we await put().
         for r in self._resources:
-            try:
-                self._pool._queue.put_nowait(r)
-            except asyncio.QueueFull:
-                await self._pool._queue.put(r)
+            await self._pool.release_resource(r)
 
 
 class ResourcePool:
     """
-    Manage a set of resources (any Python objects with async methods).
-    Use await pool.acquire() or `async with pool.acquire(): ...`
-    To take multiple resources from the same pool, use acquire(n=2).
+    Resource pool that automatically rebinds its internal queue
+    whenever used from a new event loop.
     """
 
-    def __init__(self, resources: Iterable[Any]):
+    def __init__(self, resources: Iterable[Any], stack_mode: bool = False):
         resources = list(resources)
+        self._resources = resources                # NEW: raw storage
+        self._stack_mode = stack_mode
         self._total = len(resources)
-        # The asyncio.Queue stores *available* resources
-        self._queue: asyncio.Queue = asyncio.Queue(maxsize=self._total)
-        for r in resources:
-            self._queue.put_nowait(r)
 
-    async def acquire(self, n: int = 1, timeout: Optional[float] = None) -> ResourceHandle:
+        # Stable IDs
+        self._resource_ids = {id(r): i for i, r in enumerate(resources)}
+        self._use_counts = {i: 0 for i in range(self._total)}
+
+        self._queue = None                         # NEW: lazy initialization
+        self._loop = None                          # NEW: event loop tracking
+
+        self._on_close: List[ResourceCloseFunc] = []
+
+    # ----------------------------
+    # Queue (re)initialization
+    # ----------------------------
+    def _ensure_queue(self):
         """
-        Acquire `n` resources from the pool and return a ResourceHandle.
-        If timeout is set, raises asyncio.TimeoutError if resources cannot be acquired in time.
+        Ensure the internal queue exists and is bound to the *current* event loop.
+        If called from a different loop, reinitialize queue.
         """
+        loop = asyncio.get_running_loop()
+
+        # Need to initialize or reinitialize?
+        if self._queue is None or self._loop is not loop:
+            # Choose correct queue type
+            if self._stack_mode:
+                q = asyncio.LifoQueue(maxsize=self._total)
+            else:
+                q = asyncio.Queue(maxsize=self._total)
+
+            # refill queue
+            for r in self._resources:
+                q.put_nowait(r)
+
+            self._queue = q
+            self._loop = loop
+
+    # ----------------------------
+    # Acquire
+    # ----------------------------
+    async def acquire(self, n: int = 1) -> ResourceHandle:
         if n <= 0:
             raise ValueError("n must be >= 1")
+
+        self._ensure_queue()       # <---- IMPORTANT
+
+        async def _get_one():
+            res = await self._queue.get()
+            self._use_counts[self._resource_ids[id(res)]] += 1
+            return res
+
         if n == 1:
-            coro = self._queue.get()
-            if timeout is None:
-                res = await coro
-            else:
-                res = await asyncio.wait_for(coro, timeout=timeout)
-            return ResourceHandle(self, [res])
+            return ResourceHandle(self, [await _get_one()])
 
-        # Acquire n resources sequentially (order doesn't matter inside pool)
-        async def _get_n():
-            got = []
-            for _ in range(n):
-                got.append(await self._queue.get())
-            return got
-
-        if timeout is None:
-            resources = await _get_n()
-        else:
-            resources = await asyncio.wait_for(_get_n(), timeout=timeout)
+        resources = [await _get_one() for _ in range(n)]
         return ResourceHandle(self, resources)
 
+    # ----------------------------
+    # Release
+    # ----------------------------
+    async def release_resource(self, r: Any):
+        self._ensure_queue()       # safe even if already correct
+
+        try:
+            self._queue.put_nowait(r)
+        except asyncio.QueueFull:
+            await self._queue.put(r)
+
+    # ----------------------------
+    # Misc
+    # ----------------------------
     def available(self) -> int:
-        """Number of resources currently available."""
+        self._ensure_queue()
         return self._queue.qsize()
 
     def total(self) -> int:
-        """Total number of resources originally in pool."""
         return self._total
 
-    # Convenience synchronous peek (non-blocking)
     def __repr__(self):
         return f"<ResourcePool total={self._total} available={self.available()}>"
+
+    def on_close(self, func: ResourceCloseFunc):
+        self._on_close.append(func)
+
+    def close(self):
+        # DO NOT call asyncio.run() here — it breaks loops
+        for func in self._on_close:
+            if inspect.iscoroutinefunction(func):
+                # schedule into current loop instead
+                loop = asyncio.get_event_loop()
+                loop.create_task(func())
+            else:
+                func()
+
+    def get_usage_distribution(self) -> str:
+        """Return a summary of how often each resource was used."""
+        total_uses = sum(self._use_counts.values()) or 1
+        parts = []
+        for rid, count in sorted(self._use_counts.items()):
+            pct = (count / total_uses) * 100
+            parts.append(f"Resource {rid}: {count} ({pct:.1f}%)")
+        return "[Resource usage distribution] " + ", ".join(parts)
 
 
 # ---- Helper: acquire resources from multiple pools in canonical order ----

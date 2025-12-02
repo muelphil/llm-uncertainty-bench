@@ -4,7 +4,6 @@ import numpy as np
 from async_graph_bench import Model, GenerationParameters
 
 from .apricot_mc_calc import build_apricot_pre, build_apricot_post
-from .format_assistant_message import format_assistant_message
 
 
 class Verbalized2SApricot:
@@ -15,23 +14,24 @@ class Verbalized2SApricot:
     Adapted from the original implementation in the paper https://arxiv.org/abs/2305.14975
     """
 
-    dependencies = ["questions", "options", "selected_options", "assistant_texts", "reasoning_texts"]
+    requires = ["questions", "options", "selected_options", "assistant_texts", "reasoning_texts"]
 
     def __init__(
             self,
             confidence_prompt: str,
-            max_new_tokens: int = 15,
-            system_prompt: str = None,
-            dependency_name="verbalized_2s_answer"
+            max_new_tokens,
+            dependency_name="verbalized_2s_answer",
+            response_format=None  # {"type": "regex", "regex": "Probability: (1\\.0|0\\.\\d+)$"}
     ):
-        self.system_prompt = system_prompt
         self.confidence_prompt = confidence_prompt
         self.max_new_tokens = max_new_tokens
         self.dependency_name = dependency_name
-        self.stats = [dependency_name]
+        self.provides = [dependency_name, "verb_reasoning_token_count", "verb_token_count",
+                         "verb_assistant_token_count", "verb_token_alts"]
+        self.generation_params = GenerationParameters(max_tokens=self.max_new_tokens, logprobs=20, temperature=0.0,
+                                                      response_format=response_format)
 
     async def __call__(self, stats: Dict[str, np.ndarray], model: Model):
-
         pre_prompts = [
             build_apricot_pre(question, options, selected_option)
             for question, options, selected_option
@@ -50,24 +50,22 @@ class Verbalized2SApricot:
 
         chats = []
         for pre_prompt, guess, post_prompt in zip(pre_prompts, guesses, post_prompts):
-            messages = []
-            if self.system_prompt:
-                messages.append({"role": "system", "content": self.system_prompt})
-            messages.extend([
+            messages = [
                 {"role": "user", "content": pre_prompt},
                 {"role": "assistant", "content": guess},
-                # {"role": "user", "content": post_prompt},
-                # {"role": "assistant", "content": conclusion},
                 {"role": "user", "content": self.confidence_prompt},
-            ])
+            ]
             chats.append(messages)
 
         # make Post call
-        generation_params = GenerationParameters(max_tokens=self.max_new_tokens, logprobs=20, temperature=0.0)
-        out = await model.query(chats, generation_params=generation_params)
+        out = await model.query(chats, generation_params=self.generation_params)
         answers = out.get_assistant_tokens_alternatives()
 
         return {
+            "verb_assistant_token_count": [len(t) for t in out.get_assistant_tokens()],
+            "verb_reasoning_token_count": [len(t) for t in out.get_reasoning_tokens()],
+            "verb_reasoning_message": out.get_reasoning_messages(),
+            "verb_assistant_message": out.get_assistant_messages(),
             self.dependency_name: answers
         }
 
@@ -79,20 +77,23 @@ class VerbalizedArithmetic:
     Only usabe for instruct-finetuned models with chat template support.
     Adapted from the original implementation in the paper https://arxiv.org/abs/2305.14975
     """
-    dependencies = ["questions", "assistant_texts", "reasoning_texts"]
+    requires = ["questions", "assistant_texts", "reasoning_texts"]
 
     def __init__(
             self,
             confidence_prompt: str,
-            max_new_tokens: int = 15,
-            system_prompt: str = None,
-            dependency_name="verbalized_2s_answer"
+            max_new_tokens: int,
+            dependency_name="verbalized_2s_answer",
+            response_format=None  # {"type": "regex", "regex": "Probability: (1\\.0|0\\.\\d+)$"}
     ):
-        self.system_prompt = system_prompt
         self.dependency_name = dependency_name
-        self.stats = [dependency_name]
+        self.provides = [dependency_name, "verb_reasoning_token_count", "verb_token_count",
+                         "verb_assistant_token_count", "verb_token_alts"]
         self.confidence_prompt = confidence_prompt
         self.max_new_tokens = max_new_tokens
+        self.response_format = response_format
+        self.generation_params = GenerationParameters(max_tokens=self.max_new_tokens, logprobs=20, temperature=0,
+                                                      response_format=response_format)
 
     async def __call__(self, stats: Dict[str, np.ndarray], model: Model):
         prompts = [
@@ -107,18 +108,21 @@ class VerbalizedArithmetic:
         ]
         chats = []
         for prompt, guess in zip(prompts, guesses):
-            messages = []
-            if self.system_prompt:
-                messages.append({"role": "system", "content": self.system_prompt})
-            messages.extend([
+            messages = [
                 {"role": "user", "content": prompt},
                 {"role": "assistant", "content": guess},
                 {"role": "user", "content": self.confidence_prompt},
-            ])
+            ]
             chats.append(messages)
 
         # make Post call
-        generation_params = GenerationParameters(max_tokens=self.max_new_tokens, logprobs=20, temperature=0)
-        out = await model.query(chats, generation_params=generation_params)
+        out = await model.query(chats, generation_params=self.generation_params)
         answers = out.get_assistant_tokens_alternatives()
-        return {self.dependency_name: answers}
+
+        return {
+            "verb_assistant_token_count": [len(t) for t in out.get_assistant_tokens()],
+            "verb_reasoning_token_count": [len(t) for t in out.get_reasoning_tokens()],
+            "verb_reasoning_message": out.get_reasoning_messages(),
+            "verb_assistant_message": out.get_assistant_messages(),
+            self.dependency_name: answers
+        }

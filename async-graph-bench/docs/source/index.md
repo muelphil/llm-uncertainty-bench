@@ -1,6 +1,4 @@
-# Welcome to Your Project Docs
-
-These are the docs for **Your Project**.
+# Welcome to the Documentation of `async-graph-bench`
 
 ```{tableofcontents}
 ```

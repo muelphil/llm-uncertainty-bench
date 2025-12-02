@@ -7,7 +7,7 @@ from .split_dataframe import split_dataframe
 
 
 class ArithmeticBaseDatasetProvider(DataSource):
-    stats = ["questions", "correct_answer", "unit"]
+    provides = ["questions", "correct_answer", "unit"]
 
     def __init__(self, df, subset: tuple = None, limit_items=None):  # TODO remove iterations
 
@@ -37,6 +37,6 @@ class ArithmeticBaseDatasetProvider(DataSource):
             }
             counter += 1
 
-    def iter_keys(self):
+    def iter_ids(self):
         for idx, row in self.df.iterrows():
             yield row.name

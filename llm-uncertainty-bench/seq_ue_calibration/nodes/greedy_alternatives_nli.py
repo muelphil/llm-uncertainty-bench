@@ -8,12 +8,12 @@ import numpy as np
 
 # bevor batching across generations: 1 min für 10.000 entries
 class GreedyAlternativesSimpleNLICalculator:
-    stats = ["assistant_tokens_alternatives_nli"]
-    dependencies = ["assistant_tokens_decoded_alternatives"]
+    provides = ["assistant_tokens_alternatives_nli"]
+    requires = ["assistant_tokens_decoded_alternatives"]
 
-    async def __call__(self, dependencies: Dict[str, np.array], nli_model) -> Dict[
+    async def __call__(self, item_stats: Dict[str, np.array], nli_model) -> Dict[
         str, np.ndarray]:  # nli_model : RemoteEncoderModel
-        greedy_alternatives = dependencies["assistant_tokens_decoded_alternatives"]
+        greedy_alternatives = item_stats["assistant_tokens_decoded_alternatives"]
 
         # start_time = time.time_ns()
         # total = (sum(len(t) for t in greedy_alternatives) * 4)

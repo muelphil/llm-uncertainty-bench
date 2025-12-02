@@ -7,6 +7,7 @@ import pandas as pd
 from diskcache import Cache
 from tqdm import tqdm
 
+from .combined_id import get_combined_id_from_parts
 from .serializers import ZLibCompressionSerializer, PickleSerializer, Serializer
 from .store import DataStore
 
@@ -30,10 +31,11 @@ def truncate_innermost_arrays(arr: np.ndarray) -> np.ndarray:
 
     return truncated_arr
 
+
 _sentinel = object()
 
-class DiskCacheStore(DataStore):
 
+class DiskCacheStore(DataStore):
 
     def __init__(self, directory, filename, serializers: List[Serializer] = None, create_okay=False, *args, **kwargs):
         """
@@ -50,9 +52,11 @@ class DiskCacheStore(DataStore):
             log.info(f"Diskcache {self.cache_path} not found, creating it.")
         self.cache = Cache(
             self.cache_path,
-            size_limit=20 * 1024**3, # 20GB
+            # Note: The actual size on disk may exceed this size_limit due to 'cull_limit' set to 0 -- 20 GB is only the max file size that can be written
+            # This does not limit the cache size, only the size of individual files written to disk.
+            size_limit=20 * 1024 ** 3,  # 20GB
             disk_min_file_size=2 ** 18,  # 256 kb
-            eviction_policy='none' # should not remove items
+            eviction_policy='none'  # should not remove items
         )
         self.cache.reset('cull_limit', 0)  # Disable automatic evictions.
         self.serializers = serializers or [PickleSerializer(), ZLibCompressionSerializer()]
@@ -79,17 +83,19 @@ class DiskCacheStore(DataStore):
         # Store the serialized item in the cache
         self.cache[item_index] = serialized
 
-    def delete(self, id: Any, iteration=0, default=_sentinel):
-        combined_id = (iter, *id) if isinstance(id, tuple) else (iter, id)
+    def delete(self, id: Any, iter=0, default=_sentinel):
+        combined_id = get_combined_id_from_parts(id, iter)
         return self.cache.delete(combined_id)
 
-    def iter_indices(self):
+    def iter_keys(self):
         """
         Lazily retrieve all item IDs currently in the store.
 
         :yield: Each key (ID) one by one.
         """
-        yield from self.cache.iterkeys()
+        for combined_key in self.cache.iterkeys():
+            yield (combined_key[1:], combined_key[0]) if len(combined_key) > 2 else (combined_key[1], combined_key[0])
+        # yield from self.cache.iterkeys()
 
     def iter_items(self):
         for key in self.cache.iterkeys():
@@ -98,14 +104,14 @@ class DiskCacheStore(DataStore):
                 serialized = serializer.deserialize(serialized)
             yield serialized
 
-    def contains_id(self, id, iter=0):
+    def contains_key(self, id, iter=0):
         """
         Check if the cache contains an item with the given ID.
 
         :param item_index: The unique identifier for the item.
         :return: True if the item exists, False otherwise.
         """
-        combined_id = (iter, *id) if isinstance(id, tuple) else (iter, id)
+        combined_id = get_combined_id_from_parts(id, iter)
         return combined_id in self.cache
 
     def load(self, id, iter=0):
@@ -116,7 +122,7 @@ class DiskCacheStore(DataStore):
         :return: The decompressed item as a dictionary.
         :raises KeyError: If the item does not exist in the cache.
         """
-        combined_id = (iter, *id) if isinstance(id, tuple) else (iter, id)
+        combined_id = get_combined_id_from_parts(id, iter)
         if combined_id not in self.cache:
             return None
 
@@ -124,17 +130,6 @@ class DiskCacheStore(DataStore):
         # Deserialize the item in reverse order
         for serializer in reversed(self.serializers):
             serialized = serializer.deserialize(serialized)
-
-        # Note: this was a temporary fix for a len mismatch of the alternatives
-        # Check if 'serialized' is a dictionary
-        # if isinstance(serialized, dict):
-        #     for key in ["greedy_tokens_decoded_alternatives", "greedy_log_probs", "conclusion_log_probs",
-        #                 "conclusion_tokens_decoded_alternatives"]:
-        #         if key in serialized:
-        #             serialized[key] = truncate_innermost_arrays(serialized[key])
-        #     # Replace all list values with numpy arrays
-        #     serialized = {key: np.array(value) if isinstance(value, list) else value for key, value in
-        #                   serialized.items()}
 
         return serialized
 
@@ -145,12 +140,10 @@ class DiskCacheStore(DataStore):
         :return: A pandas DataFrame containing all cached items, with IDs and properties as columns.
         """
         item_data = []
-        # item_indices = []
 
+        keys = self.cache.iterkeys()
         if show_progress:
-            keys = tqdm(self.cache.iterkeys(), total=len(self.cache), desc="Loading cache")
-        else:
-            keys = self.cache.iterkeys()
+            keys = tqdm(keys, total=len(self.cache), desc="Loading cache")
 
         for item_index in keys:
             serialized = self.cache[item_index]
