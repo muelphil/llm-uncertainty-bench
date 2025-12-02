@@ -164,6 +164,18 @@ if __name__ == "__main__":
                     batch_size=100,
                 ),
                 NodeConfig(
+                    (ArithmeticResponseGeneratorPost if is_arithmetic else MCQAAPriCoTResponseGeneratorPost)(is_reasoning=model["type"] == "reasoning"),
+                    data_store=partial(DiskCacheStore, serializers=[
+                        ResponseCompressorSerializer(prefix="conclusion"),
+                        ResponseCompressorSerializer(prefix="conclusion_reasoning"),
+                        PickleSerializer(),
+                        ZLibCompressionSerializer()
+                    ]),
+                    resource_builder=build_model,
+                    greedy=True,
+                    batch_size=100,
+                ),
+                NodeConfig(
                     (VerbalizedArithmetic if is_arithmetic else Verbalized2SApricot)(
                         confidence_prompt=verbalized_prompt,
                         max_new_tokens=4096 if model["type"] == "reasoning" else 15,
@@ -185,22 +197,6 @@ if __name__ == "__main__":
                     batch_size=200,
                 ),
             ]
-
-            if is_arithmetic:
-                nodes.append(
-                    NodeConfig(
-                        (ArithmeticResponseGeneratorPost if is_arithmetic else MCQAAPriCoTResponseGeneratorPost)(is_reasoning=model["type"] == "reasoning"),
-                        data_store=partial(DiskCacheStore, serializers=[
-                            ResponseCompressorSerializer(prefix="conclusion"),
-                            ResponseCompressorSerializer(prefix="conclusion_reasoning"),
-                            PickleSerializer(),
-                            ZLibCompressionSerializer()
-                        ]),
-                        resource_builder=build_model,
-                        greedy=True,
-                        batch_size=100,
-                    ),
-                )
 
             if dataset["id"] == "SciBench" and not args.main_model_steps_only:
                 nodes.append(NodeConfig(
