@@ -200,7 +200,7 @@ async def acquire_from_many(
         for i in order:
             pool = pools[i]
             cnt = counts[i]
-            handle = await pool.acquire(n=cnt, timeout=timeout)
+            handle = await pool.acquire(n=cnt)
             acquired.append((i, handle))
     except Exception:
         # On failure, release all resources we already acquired
