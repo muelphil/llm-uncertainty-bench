@@ -1,8 +1,8 @@
-# Benchmarking Uncertainty Estimation in Large Language Model Replies for Natural Science Question Answering
+# Benchmarking Uncertainty Calibration in Large Language Model Long-Form Question Answering
 
 This repository contains the code, figures, and analysis scripts accompanying the paper  
-**"Benchmarking Uncertainty Estimation in Large Language Model Replies for Natural Science Question Answering"**  
-(in review for **International Conference on Learning Representations (ICLR) 2026**).
+**"Benchmarking Uncertainty Calibration in Large Language Model Long-Form Question Answering"**  
+(in review for **International Conference on Machine Learning (ICML) 2026**).
 
 Uncertainty estimation is critical for reliable deployment of LLMs in scientific applications. This work benchmarks different methods to assess calibration of confidence scores in natural science question answering.
 
