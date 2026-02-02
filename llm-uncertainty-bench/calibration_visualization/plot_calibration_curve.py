@@ -108,7 +108,7 @@ def plot_calibration_curve(bin_confidences, bucket_accuracies, bucket_counts, co
 
     # Display the ECE in the upper left corner
     if ece is not None:
-        ax.text(0.02, 0.98, f"ECE:\n{ece:.4f}", transform=ax.transAxes, fontsize=24,
+        ax.text(0.02, 0.98, f"ECE:{ece:.4f}", transform=ax.transAxes, fontsize=16,
                 verticalalignment='top', horizontalalignment='left', color="black")
 
     y_ticks = np.arange(0.2, 1.1, 0.2)

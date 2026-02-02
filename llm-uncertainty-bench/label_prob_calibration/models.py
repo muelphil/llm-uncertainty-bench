@@ -6,7 +6,7 @@ DEFAULTS = {
     "gpu_memory_utilization": 0.90,
     "enable_prefix_caching": True,
     "enforce_eager": True,
-    "max_model_len": 4096,
+    "max_model_len": 16384,
     "seed": random.getrandbits(32)
 }
 
@@ -21,63 +21,79 @@ Your thoughts or/and draft, like working through an exercise on scratch paper. B
 Here, provide a concise summary that reflects your reasoning and presents a clear final answer to the user. Don't mention that this is a summary.
 
 Problem:"""
-
-
 MODELS = [
     # OpenAI GPT-OSS
     {
-        # pass chat_template_kwargs={"reasoning_effort": "low"} to handle reasoning
-        # the following was tested again and didn't prove correct (leaving it for documentation): adding "<|channel|>analysis<|message|>a<|end|><|start|>assistant<|channel|>final<|message|>" to the input prompt "disables" the reasoning completely
         "name": "openai/gpt-oss-20b",
         "kwargs": {"reasoning_parser": "openai_gptoss"},
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
         "type": "reasoning",
-        "end_of_reasoning_pattern": ['<|end|>', '<|start|>', 'assistant', '<|channel|>', 'final', '<|message|>'],
-        "reasoning_parser": "gpt-oss"
+        "reasoning_parser": "gpt-oss",
+        "basename": "gpt-oss-20b",
+        "yes_no_ids": [11377, 3004],
     },
     {
         "name": "openai/gpt-oss-120b",
-        "kwargs": {"gpu_memory_utilization": 0.95, "reasoning_parser": "openai_gptoss"},
+        "kwargs": {"reasoning_parser": "openai_gptoss"},
         "kwargs_a100": {"tensor_parallel_size": 4},
         "kwargs_h100": {"tensor_parallel_size": 2},
         "type": "reasoning",
-        "end_of_reasoning_pattern": ['<|end|>', '<|start|>', 'assistant', '<|channel|>', 'final', '<|message|>'],
-        "reasoning_parser": "gpt-oss"
+        "reasoning_parser": "gpt-oss",
+        "basename": "gpt-oss-120b",
+        "yes_no_ids": [11377, 3004],
     },
 
-    # Mistral / Nemo / Small
+    # Mistral
     {
         "name": "mistralai/Ministral-8B-Instruct-2410",
+        "shortname": "Ministral-8B",
         "kwargs": {"tokenizer_mode": "mistral", "tensor_parallel_size": 1},
-        "type": "instruct"
+        "type": "instruct",
+        "basename": "Ministral-8B-Instruct-2410",
+        "yes_no_ids": [13830, 3501],
     },
     {
         "name": "mistralai/Mistral-Nemo-Base-2407",
         "kwargs": {"tensor_parallel_size": 1, "tokenizer_mode": "mistral"},
-        "type": "base"
+        "type": "base",
+        "basename": "Mistral-Nemo-Base-2407",
+        "yes_no_ids": [13830, 3501],
     },
     {
         "name": "mistralai/Mistral-Nemo-Instruct-2407",
+        "shortname": "Mistral-Nemo-7B",
         "kwargs": {"tensor_parallel_size": 1, "tokenizer_mode": "mistral"},
-        "type": "instruct"
+        "type": "instruct",
+        "basename": "Mistral-Nemo-Instruct-2407",
+        "yes_no_ids": [13830, 3501],
     },
     {
         "name": "mistralai/Mistral-Small-3.1-24B-Base-2503",
-        "kwargs": {"tokenizer_mode": "mistral", "load_format": "mistral", "config_format": "mistral"},
+        "kwargs": {
+            "tokenizer_mode": "mistral",
+            "load_format": "mistral",
+            "config_format": "mistral",
+        },
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
-        "type": "base"
+        "type": "base",
+        "shortname": "Mistral-Small-3.1-24B",
+        "basename": "Mistral-Small-3.1-24B-Base-2503",
+        "yes_no_ids": [13830, 3501],
     },
     {
         "name": "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
-        "kwargs": {"tokenizer_mode": "mistral", "load_format": "mistral", "config_format": "mistral", "gpu_memory_utilization": 0.95},
+        "shortname": "Mistral-Small-3.2-24B",
+        "kwargs": {"tokenizer_mode": "mistral", "load_format": "mistral", "config_format": "mistral",
+                   "gpu_memory_utilization": 0.95},
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
-        "type": "instruct"
+        "type": "instruct",
+        "yes_no_ids": [13830, 3501],
     },
     {
-        # To enable reasoning, the above MAGISTRAL_SYSTEM_PROMPT must be used. The response will then contain [THINK][/THINK] tags in outputs[0].outputs[0].text
+        # To enable reasoning, the above MAGISTRAL_SYSTEM_PROMPT must be used. The response will then containt [THINK][/THINK] tags in outputs[0].outputs[0].text
         # The tokens according to logprobs will NOT contain these tokens as plaintexts. Instead, the token_ids must be searched for 34 ([THINK]) and 35 ([/THINK])
         # To get the Magistral tokenizer:
         # from transformers import AutoTokenizer
@@ -88,22 +104,22 @@ MODELS = [
                    "config_format": "mistral", "gpu_memory_utilization": 0.90},
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
-        "type": "instruct", # instruct cause reasoning through the MAGISTRAL_SYSTEM_PROMPT has not been enabled
-        "end_of_reasoning_pattern": [35],  # [/THINK]
-        "reasoning_parser": "mistral"
+        "type": "reasoning",
+        "reasoning_parser": "mistral",
+        "yes_no_ids": [13830, 3501],
     },
     {
         "name": "mistralai/Magistral-Small-2507",
-        "basename": "Magistral-Small-2507-Reasoning-Enabled", # <===============
-        "shortname": "Magistral-Small-Reasoning",
+        "basename": "Magistral-Small-2507",  # <===============
+        "shortname": "Magistral-Small-24B-Reasoning",  # <===============
         "kwargs": {"tokenizer_mode": "mistral", "load_format": "mistral", "reasoning_parser": "mistral",
-                   "config_format": "mistral", "gpu_memory_utilization": 0.90, "max_model_len": 10240,},
+                   "config_format": "mistral", "gpu_memory_utilization": 0.90},
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
         "type": "reasoning",
-        "end_of_reasoning_pattern": [35],  # [/THINK]
         "system_prompt": MAGISTRAL_SYSTEM_PROMPT,  # <===============
-        "reasoning_parser": "mistral"
+        "reasoning_parser": "mistral",
+        "yes_no_ids": [13830, 3501],
     },
 
     # Meta Llama
@@ -112,91 +128,143 @@ MODELS = [
         "kwargs": {"gpu_memory_utilization": 0.95},
         "kwargs_a100": {"tensor_parallel_size": 4},
         "kwargs_h100": {"tensor_parallel_size": 2},
-        "type": "base"
+        "type": "base",
+        "basename": "Llama-3.1-70B",
+        "yes_no_ids": [7566, 2360],
     },
     {
         "name": "meta-llama/Llama-3.3-70B-Instruct",
         "kwargs": {"gpu_memory_utilization": 0.95},
         "kwargs_a100": {"tensor_parallel_size": 4},
         "kwargs_h100": {"tensor_parallel_size": 2},
-        "type": "instruct"
+        "type": "instruct",
+        "shortname": "Llama-3.3-70B",
+        "basename": "Llama-3.3-70B-Instruct",
+        "yes_no_ids": [7566, 2360],
     },
     {
         "name": "meta-llama/Llama-4-Scout-17B-16E",
-        "kwargs_a100": {"tensor_parallel_size": 8},
-        "kwargs_h100": {"tensor_parallel_size": 4},
-        "type": "base"
+        "kwargs_a100": {"tensor_parallel_size": 4},
+        "kwargs_h100": {"tensor_parallel_size": 2},
+        "type": "base",
+        "basename": "Llama-4-Scout-17B-16E",
+        "yes_no_ids": [15580, 3318],
     },
     {
         "name": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
-        "kwargs_a100": {"tensor_parallel_size": 8},
-        "kwargs_h100": {"tensor_parallel_size": 4},
-        "type": "instruct"
+        "kwargs_a100": {"tensor_parallel_size": 4},
+        "kwargs_h100": {"tensor_parallel_size": 2},
+        "type": "instruct",
+        "shortname": "Llama-4-Scout-17B",
+        "basename": "Llama-4-Scout-17B-16E-Instruct",
+        "yes_no_ids": [15580, 3318],
     },
 
-    # Qwen 30B A3B family
+    # Qwen
     {
         "name": "Qwen/Qwen3-30B-A3B-Base",
         "kwargs": {"enable_expert_parallel": True},
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
-        "type": "base"
+        "type": "base",
+        "basename": "Qwen3-30B-A3B-Base",
+        "yes_no_ids": [7414, 2308],
     },
     {
         "name": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+        "shortname": "Qwen3-30B-A3B-Instruct",
         "kwargs": {"enable_expert_parallel": True},
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
-        "type": "instruct"
+        "type": "instruct",
+        "basename": "Qwen3-30B-A3B-Instruct-2507",
+        "yes_no_ids": [7414, 2308],
     },
     {
-        # pass chat_template_kwargs={"enable_thinking": True} to handle reasoning ouput
         "name": "Qwen/Qwen3-30B-A3B-Thinking-2507",
-        "kwargs": {"enable_expert_parallel": True, "reasoning_parser": "qwen3", "max_model_len": 10240,},
+        "shortname": "Qwen3-30B-A3B-Thinking",
+        "kwargs": {
+            "enable_expert_parallel": True,
+            "reasoning_parser": "qwen3",
+        },
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
         "type": "reasoning",
-        "end_of_reasoning_pattern": ['</think>', '\n\n'],
-        "reasoning_parser": "qwen"
+        "reasoning_parser": "deepseek",
+        "basename": "Qwen3-30B-A3B-Thinking-2507",
+        "yes_no_ids": [7414, 2308],
     },
 
-    # DeepSeek R1 distills
+    # Deepseek
     {
         "name": "deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
-        "kwargs": {"gpu_memory_utilization": 0.95, "reasoning_parser": "deepseek_r1", "max_model_len": 10240},
+        "shortname": "DeepSeek-Llama-70B",
+        "kwargs": {
+            "gpu_memory_utilization": 0.95,
+            "reasoning_parser": "deepseek_r1",
+        },
         "kwargs_a100": {"tensor_parallel_size": 4},
         "kwargs_h100": {"tensor_parallel_size": 2},
         "type": "reasoning",
-        "end_of_reasoning_pattern": ['</think>', '\n\n'],
-        "reasoning_parser": "deepseek"
+        "reasoning_parser": "deepseek",
+        "basename": "DeepSeek-R1-Distill-Llama-70B",
+        "yes_no_ids": [7566, 2360],
     },
     {
         "name": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
-        "kwargs": {"reasoning_parser": "deepseek_r1", "max_model_len": 10240},
+        "shortname": "DeepSeek-Qwen-32B",
+        "kwargs": {"reasoning_parser": "deepseek_r1"},
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
         "type": "reasoning",
-        "end_of_reasoning_pattern": ['</think>', '\n\n'],
-        "reasoning_parser": "deepseek"
+        "reasoning_parser": "deepseek",
+        "basename": "DeepSeek-R1-Distill-Qwen-32B",
+        "yes_no_ids": [7414, 2308],
     },
 
-    # Google Gemma 3 27B
+    # Google
     {
         "name": "google/gemma-3-27b-pt",
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
-        "type": "base"
+        "type": "base",
+        "basename": "gemma-3-27b-pt",
+        "yes_no_ids": [8438, 2301],  # ["▁Yes","▁No"]
     },
     {
         "name": "google/gemma-3-27b-it",
+        "shortname": "google/gemma-3-27b",
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
-        "type": "instruct"
+        "type": "instruct",
+        "basename": "gemma-3-27b-it",
+        "yes_no_ids": [8438, 2301],
+    },
+    # --models Ministral-8B-Instruct-2410,Phi-3-mini-4k-instruct,Llama-3.1-8B-Instruct,Qwen2.5-14B-Instruct
+    {
+        "name": "microsoft/Phi-3-mini-4k-instruct", #4B model
+        "type": "instruct",
+        "kwargs_a100": {"tensor_parallel_size": 1},
+        "kwargs_h100": {"tensor_parallel_size": 1},
+        "yes_no_ids": [3869, 1939],
+    },
+    {
+        "name": "meta-llama/Llama-3.1-8B-Instruct",
+        "type": "instruct",
+        "kwargs_a100": {"tensor_parallel_size": 1},
+        "kwargs_h100": {"tensor_parallel_size": 1},
+        "yes_no_ids":  [7566, 2360],
+    },
+    {
+        "name": "Qwen/Qwen2.5-14B-Instruct",
+        "type": "instruct",
+        "kwargs_a100": {"tensor_parallel_size": 2},
+        "kwargs_h100": {"tensor_parallel_size": 1},
+        "yes_no_ids": [7414, 2308],
     },
 ]
 
 for model in MODELS:
     provider, basename = model["name"].split("/", 1)
-    model["provider"] = provider
     if "basename" not in model:
         model["basename"] = basename
