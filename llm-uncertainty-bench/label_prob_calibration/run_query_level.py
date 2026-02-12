@@ -33,6 +33,7 @@ def build_model_builder(model_name):
             tokenizer_pool = ResourcePool([tokenizer])
 
             def close_resource_func():
+                nonlocal model, tokenizer
                 del model
                 del tokenizer
                 gc.collect()
@@ -102,6 +103,7 @@ if __name__ == "__main__":
     filtered_datasets = [d for d in datasets if dataset_matches(d)]
 
 
+    # --models Ministral-8B,Mistral-Nemo-7B,Llama-3.3-70B,Phi-3-mini-4k-instruct,Llama-3.1-8B-Instruct,Qwen2.5-14B-Instruct
     # Filter models
     def model_matches(model):
         name_match = any(q in model["name"].lower() for q in queries) if queries else True
