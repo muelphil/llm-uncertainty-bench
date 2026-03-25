@@ -38,7 +38,7 @@ class Verbalized2SApricot:
             in zip(stats["questions"], stats["options"], stats["selected_options"])
         ]
         guesses = [
-            (f"Though Process:\n{reasoning_text}\n\nFinal Answer:\n" if len(reasoning_text) else "") + text
+            (f"Thought Process:\n{reasoning_text}\n\nFinal Answer:\n" if len(reasoning_text) else "") + text
             for reasoning_text, text
             in zip(stats["reasoning_texts"], stats["assistant_texts"])
         ]
@@ -102,7 +102,7 @@ class VerbalizedArithmetic:
             in stats["questions"]
         ]
         guesses = [
-            (f"Though Process:\n{reasoning_text}\n\nFinal Answer:\n" if len(reasoning_text) else "") + text
+            (f"Thought Process:\n{reasoning_text}\n\nFinal Answer:\n" if len(reasoning_text) else "") + text
             for reasoning_text, text
             in zip(stats["reasoning_texts"], stats["assistant_texts"])
         ]
