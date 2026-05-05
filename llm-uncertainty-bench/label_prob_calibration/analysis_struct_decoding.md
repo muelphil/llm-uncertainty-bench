@@ -14,674 +14,740 @@ jupyter:
     name: python3
 ---
 
-```python
-%load_ext autoreload
-%autoreload 2
+# Experiment 1 – Label Probability Calibration
 
-import json
+This notebook analyses **token-level uncertainty** in multiple-choice QA: how well
+the label-choice probabilities assigned by a model reflect its actual likelihood of
+being correct. The pipeline is:
+
+1. Load raw benchmark results (one CSV per prompt × dataset × model) into `raw_data`.
+2. Align predictions with ground-truth answers and compute calibration metrics into `cal_data`.
+3. Visualise calibration grids, the normalisation effect, and label-choice bias.
+
+# Imports
+
+```python
+%load_ext
+autoreload
+%autoreload
+2
+
+import os
+import pickle
 import re
 import statistics
-import traceback
+from collections import defaultdict
 from itertools import product
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import numpy as np
 from async_graph_bench import CSVDataStore
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import to_rgb
 from sklearn.metrics import roc_auc_score
-
-from benchmark_datasets import datasets
-from models import MODELS
-
-#https://stackoverflow.com/questions/34387893/output-matplotlib-figure-to-svg-with-text-as-text-not-curves
 ```
+
 ```python
 import sys
 from pathlib import Path
 
-# add calibration_visualization to sys.path
-# project_root = Path(__file__).resolve().parent.parent  # if you run as script
 project_root = Path().resolve().parent
-sys.path.append(str(project_root / "calibration_visualization"))
+sys.path.insert(0, str(project_root / "calibration_visualization"))
+sys.path.insert(0, str(project_root / "shared"))
+sys.path.insert(0, str(Path().resolve()))
 ```
 
 ```python
-from plot_bucket_counts import plot_bucket_counts
-from calculate_calibration_data import calculate_calibration_data, calculate_calibration_data_discrete
-from plot_calibration_curve import plot_calibration_curve
+from calculate_calibration_data import calculate_calibration_data
 from ece import calculate_ece
 from normalized_entropy import calculate_normalized_entropy
+from plot_calibration_curve import plot_calibration_curve
+
+from config import CALIBRATION_PLOT_COLORS, apply_matplotlib_defaults
+from datasets_exp1 import datasets, build_mmlu_physics_dataset
+from generate_grid_plot import generate_grid_plot
+from models import MODELS
+from plot_empty import plot_empty
 ```
 
-## Utils
+# Configuration
+
+Apply global plotting defaults and create the output directory tree.
 
 ```python
-# Setting Font for Plots
-#plt.rcParams['font.family'] = 'Palatino Linotype'
-plt.rcParams['font.family'] = 'Times New Roman'
-# Optional if saving SVG with text as text (not paths
-plt.rcParams['svg.fonttype'] = 'none'
-```
+apply_matplotlib_defaults()
 
-```python
-import os
+resources_dir = Path(".\\resources_struct_decoding")
+figures_dir = resources_dir / "figures"
+tables_dir = resources_dir / "tables"
 
-dirs = ["resources_struct_decoding", "resources_struct_decoding/figures", "resources_struct_decoding/tables",
-        "resources_struct_decoding/figures/full_plots"]
-
-for d in dirs:
+for d in [resources_dir, figures_dir, tables_dir, figures_dir / "full_plots"]:
     os.makedirs(d, exist_ok=True)
+
+
+def safe_format(val, fmt="4f"):
+    """Format *val* as a float string; fall back to str on failure."""
+    try:
+        return f"{val:.{fmt}}"
+    except (TypeError, ValueError):
+        return str(val)
 ```
 
-```python
-class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        if isinstance(obj, np.bool_):
-            return bool(obj)
-        if isinstance(obj, set):
-            return list(obj)
-        return super().default(obj)
+# Model Selection
 
-
-def numpy_decoder(dct):
-    # Iterate through each key-value pair in the dictionary
-    for key, value in dct.items():
-        if isinstance(value, list):
-            dct[key] = np.array(value)  # Convert lists to numpy arrays
-        elif isinstance(value, dict):
-            dct[key] = numpy_decoder(value)  # Recursively handle nested dictionaries
-    return dct
-```
-
-# Setting Path to Data
-
-
-## Prompts, Models, Datasets
-
-```python
-base_path = Path(".\\data_struct_dec")
-```
-
-```python
-prompt_indices = [1]  #[1, 2, 3, 4]
-prompt_designs = [
-    {"path": base_path / f"data_prompt_{i}", "label": f"Prompt {i}", "idx": i, "basename": f"data_prompt_{i}"} for i in
-    prompt_indices
-]
-prompt_paths = [prompt["path"] for prompt in prompt_designs]
-```
-
-# Prompt Example Printing
+Attach `id`, `basename`, and `shortname` convenience fields to every model dict, then
+restrict to the subset used in this experiment (all models except the last three).
 
 ```python
 for model in MODELS:
-    model["id"] = model["basename"]
+    model["id"] = model.get("basename", os.path.basename(model["name"]))
+    if "basename" not in model:
+        model["basename"] = os.path.basename(model["name"])
     if "shortname" not in model:
         model["shortname"] = re.sub(r"(\-\d+|\-v\d.\d)$", "", model["id"])
 
-model_ids = [model["id"] for model in MODELS]
-
-# For now, only do reasoning
-# models = [model for model in MODELS if model["type"] != "reasoning" and "gemma-3-27b-pt" not in model["name"]]
-# models = MODELS
-# models = [model for model in MODELS if not any(p in model["name"] for p in ["gemma-3-27b-pt"])]
 models = MODELS[:-3]
-
-subsets = ["college_physics", "conceptual_physics", "high_school_physics"]
-MMLU_dataset = next(d for d in datasets if d['id'] == "MMLU")
-mmlu_df = MMLU_dataset["data_source"]().df
-df_physics = mmlu_df[mmlu_df.index.get_level_values(0).isin(subsets)]
-MMLU_physics_dataset = {
-    'id': 'MMLU_Physics',
-    'df': df_physics,
-    'n': len(df_physics)
-}
-datasets.insert(1, MMLU_physics_dataset)
-
-datasets_by_id = {d["id"]: d for d in datasets}
 ```
+
+# Dataset Setup
+
+Load the MMLU DataFrame once, then derive the physics-only subset from it.
+All other datasets are loaded via their `data_source` callable. A `df` field is
+stored in each dataset dict so the same DataFrame is reused throughout the notebook
+without re-reading disk.
 
 ```python
-[d['id'] for d in datasets]
+mmlu_dataset = next(d for d in datasets if d["id"] == "MMLU")
+mmlu_df = mmlu_dataset["data_source"]().df
+mmlu_dataset["df"] = mmlu_df
+
+mmlu_physics_dataset = build_mmlu_physics_dataset(mmlu_df)
+all_datasets = [mmlu_dataset, mmlu_physics_dataset] + [d for d in datasets if d["id"] != "MMLU"]
+
+for dataset in all_datasets:
+    if "df" not in dataset:
+        dataset["df"] = dataset["data_source"]().df
+
+datasets_by_id = {d["id"]: d for d in all_datasets}
+[d["id"] for d in all_datasets]
 ```
+
+# Prompt Design
+
+Define the prompt variants included in this analysis. Set `prompt_indices` to
+`[1, 2, 3, 4]` to run all four structural-decoding prompt designs.
+
+```python
+base_path = Path(".\\data_struct_dec")
+
+prompt_indices = [1]  # extend to [1, 2, 3, 4] to include all prompt variants
+prompt_designs = [
+    {
+        "path": base_path / f"data_prompt_{i}",
+        "label": f"Prompt {i}",
+        "idx": i,
+        "basename": f"data_prompt_{i}",
+    }
+    for i in prompt_indices
+]
+prompt_basenames = [p["basename"] for p in prompt_designs]
+```
+
+# Prompt Example
+
+Render a sample prompt to illustrate the structured-decoding input format.
 
 ```python
 from data_sources import get_prompt_3
-
-dataset = datasets_by_id["MMLU"]
-df = dataset["data_source"]().df
-df
-```
-
-```python
 from IPython.display import display, HTML
 
-item = df.iloc[10]
-prompt = get_prompt_3(item["question"], item["choices"], dataset["shots"])
-
-display(HTML(f"<pre>{prompt}</pre>"))
+dataset_ex = datasets_by_id["MMLU"]
+item = dataset_ex["df"].iloc[10]
+prompt_text = get_prompt_3(item["question"], item["choices"], dataset_ex["shots"])
+display(HTML(f"<pre>{prompt_text}</pre>"))
 ```
 
-## Cached Data Var Initialization
+# Data Loading
+
+`load_label_prob_df` reads the raw benchmark output (one CSV per cell) from disk.
+All CSVs are loaded here into the nested dict `raw_data` so that no subsequent
+section ever re-reads disk.
+
+`raw_data[prompt_basename][dataset_id][model_id]` → `pd.DataFrame | None`
 
 ```python
-from collections import defaultdict
+def load_label_prob_df(prompt, dataset, model):
+    """Load the raw label-probability CSV for one (prompt, dataset, model) triplet.
 
-
-def fill_defaultdict(template_dd, data_dict):
-    for k, v in data_dict.items():
-        if isinstance(v, dict) and isinstance(template_dd.get(k), defaultdict):
-            fill_defaultdict(template_dd[k], v)
-        else:
-            template_dd[k] = v
-    return template_dd
-
-
-cached_data_file_path = "./cached_data.pkl"
-cached_data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: dict()))))
-```
-
-```python
-# Optional: Loading cached_data
-# if os.path.exists(cached_data_file_path):
-#     with open(cached_data_file_path, "rb") as f:  # "rb" = read binary
-#         cached_data_loaded = pickle.load(f)
-#         fill_defaultdict(cached_data, cached_data_loaded)
-#         print(f"Metadata loaded ({cached_data_file_path})")
-# else:
-#     print(f"The file {cached_data_file_path} does not exist.")
-```
-
-# Evaluating the data
-
-## Calibration Plots for Multiple Dataset, Multiple Models
-
-```python
-def get_resulting_data(data_source_df, label_prob_df, chosen_token_only=True,
-                       normalize_probabilities=True):
-    correct = []
-    certainties = []
-    accuracy = 0
-    invalid_answers = 0
-    once = True
-    for index, row in label_prob_df.iterrows():
-        if row["id"] not in data_source_df.index:
-            continue  # skip rows not in data_source_df
-        mc_task = data_source_df.loc[row["id"]]
-        certainties_for_row = np.array(row["confidence_per_choice"], dtype=float)
-        if normalize_probabilities and np.sum(certainties_for_row) > 0.0:
-            certainties_for_row /= np.sum(certainties_for_row)
-        chosen_answer = np.argmax(certainties_for_row) if np.sum(certainties_for_row) > 0.0 else None
-        if chosen_answer is not None and chosen_answer == mc_task.correct_answer:
-            accuracy += 1
-        if (chosen_answer is None or np.isnan(chosen_answer)) and chosen_token_only:
-            invalid_answers += 1
-        if chosen_token_only:
-            if chosen_answer is not None and not np.isnan(chosen_answer) and int(chosen_answer) < len(
-                    certainties_for_row):
-                correct.append(chosen_answer == mc_task.correct_answer)
-
-                if int(chosen_answer >= len(certainties_for_row)):
-                    print(f"chosen answer:{chosen_answer}, certainties for row={certainties_for_row}, task={mc_task}")
-
-                certainties.append(certainties_for_row[int(chosen_answer)])
-        else:
-            for i in range(len(certainties_for_row)):
-                correct.append(i == mc_task.correct_answer)
-                certainties.append(certainties_for_row[i])
-        once = False
-    accuracy /= len(label_prob_df)
-    return correct, certainties, accuracy, invalid_answers
-```
-```python
-def extract_subplot_data(prompt, dataset, model, chosen_only, normalize_probabilities):
-    """Extracts necessary data for a single subplot."""
-    dataset_id = dataset['id'] if dataset['id'] != "MMLU_Physics" else "MMLU"
-    result_path = f"{prompt['path']}/{dataset_id}/{model['id']}"
-    if "df" in dataset:
-        data_source_df = dataset["df"]
-    else:
-        data_source_df = dataset["data_source"]().df
-        dataset["df"] = data_source_df
-    label_prob_df = CSVDataStore(result_path, "LabelProbExtractor").to_dataframe()
-
-    correct, label_confidences, accuracy, invalid_answers = get_resulting_data(
-        data_source_df, label_prob_df,
-        chosen_token_only=chosen_only, normalize_probabilities=normalize_probabilities
-    )
-
-    bin_confidences, bucket_accuracies, bucket_counts = calculate_calibration_data(correct, label_confidences, 15)
-    ece = calculate_ece(bin_confidences, bucket_accuracies, bucket_counts)
-    try:
-        auroc = roc_auc_score(correct, label_confidences)
-    except:
-        print("prompt=", prompt['basename'])
-        print("dataset=", dataset_id)
-        print("model=", model['name'])
-        auroc = "undefined"
-    sum_series = label_prob_df["confidence_per_choice"].apply(sum).apply(lambda e: max(0.0, min(1.0, e)))
-    try:
-        result = {
-            "is_normalized": normalize_probabilities,
-            "bin_confidences": bin_confidences,
-            "bucket_accuracies": bucket_accuracies,
-            "bucket_counts": bucket_counts,
-            "ece": ece,
-            "auroc": auroc,
-            "accuracy": accuracy,
-            "label_prob_sum_mean": sum_series.mean(),
-            "label_prob_sum_median": sum_series.quantile(0.5),
-            "label_prob_sum_std": sum_series.std(),
-            "label_prob_sum_iqr": sum_series.quantile(0.75) - sum_series.quantile(0.25),
-
-            "normalized_entropy": calculate_normalized_entropy(bucket_counts),
-            "total_items": len(label_prob_df),
-            "sum_series": sum_series,
-            "invalid_answers": invalid_answers
-        }
-        if len(label_confidences):
-            result["label_prob_median"] = np.median(label_confidences)
-            result["label_prob_iqr"] = np.percentile(label_confidences, 75) - np.percentile(label_confidences, 25)
-            result["average_certainty"] = np.mean(label_confidences)
-        else:
-            result["label_prob_median"] = "undefined"
-            result["label_prob_iqr"] = "undefined"
-            result["average_certainty"] = "undefined"
-        return result
-    except IndexError as e:
-        print(f"Encoutered Index Error running for {dataset_id}/{model['id']}")
-        print("label_confidences=", label_confidences)
-        traceback.print_exc()
-
-
-def plot_empty(ax, message="No Data Available"):
-    """
-    Displays a placeholder plot with a light grey background and a centered message.
+    Uses ``dataset['data_path_id']`` (if present) as the on-disk subdirectory name
+    so MMLU_Physics results are read from the MMLU benchmark directory rather than
+    a non-existent MMLU_Physics one.
 
     Args:
-        ax (matplotlib.axes.Axes): The axes to plot onto.
-        message (str): The message to display in the center.
-    """
-    ax.set_facecolor("#f0f0f0")  # Light grey background
-    ax.text(0.5, 0.5, message,
-            horizontalalignment='center',
-            verticalalignment='center',
-            fontsize=14,
-            color="#555555",  # Darker grey text
-            transform=ax.transAxes)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.set_frame_on(False)
-
-
-def plot_subplot(ax, data, model_type: str, show_x_label=True, show_y_label=True, ece_in_plot=False):
-    """Plots calibration data on a given axis and optionally adds a table."""
-    plot_calibration_curve(
-        data["bin_confidences"], data["bucket_accuracies"], data["bucket_counts"],
-        ax=ax, colormap="Blues" if model_type == "instruct" else "Greens" if model_type == "reasoning" else "Oranges",
-        fontsize=14, tick_fontsize=10,
-        xlabel="Confidence Bins" if show_x_label else None, ylabel="Accuracy in Bin" if show_y_label else None,
-        ece=data["ece"] if ece_in_plot else None
-    )
-
-
-def safe_format(val, format="4f") -> str:
-    try:
-        return f"{val:.{format}}"
-    except (TypeError, ValueError):
-        return str(val)
-
-
-def plot_table(ax, data):
-    table_data = [
-        ["ECE", safe_format(data['ece'])],
-        ["AUROC", safe_format(data['auroc'])],
-        ["Norm. Entropy of Bucket Counts", safe_format(data['normalized_entropy'])],
-        ["Invalid Answer Count", f"{data['invalid_answers']}/{data['total_items']}"],
-        ["Accuracy", safe_format(data['accuracy'])],
-        ["Median of Label Probabilities", safe_format(data['label_prob_median'])],
-        ["IQR of Label Probabilities", safe_format(data['label_prob_iqr'])],
-        ["Median of Sum of Label Probabilities", safe_format(data['label_prob_sum_median'])],
-        ["IQR of Sum of Label Probabilities", safe_format(data['label_prob_sum_iqr'])],
-    ]
-
-    table = ax.table(cellText=table_data, loc='center', cellLoc='center')
-    # table.set_position([0.5, 0.3])  # (x, y) position in axes coordinates (0 to 1)
-    table.auto_set_font_size(False)
-    table.set_fontsize(10)
-
-    # Iterate over each cell and set alignment based on the column.
-    for (row, col), cell in table.get_celld().items():
-        if col == 0:  # First column: right aligned.
-            cell.PAD = 0.02
-            cell.get_text().set_ha('right')
-            cell.set_width(0.65)  # Adjust as needed
-        elif col == 1:  # Second column: left aligned.
-            cell.PAD = 0.04
-            cell.get_text().set_ha('left')
-            cell.set_width(0.35)  # Adjust as needed
-
-    ax.axis('off')
-
-
-def generate_grid_plot(cell_data, row_titles, col_titles, sharex=False, sharey=False,
-                       with_table=False, show_axis_labels=False, skip_annotation=False, row_col_titles_font_size=40,
-                       title_font_size=52, plot_title=None, ece_in_plot=False):
-    """
-    Generates a grid of subplots.
-
-    When with_table is True, the grid will have double the rows:
-      - The even-numbered rows (0,2,…) display calibration curves.
-      - The odd-numbered rows (1,3,…) display the corresponding tables.
-
-    Args:
-        cell_data (list[list[tuple]]): A 2D list (rows x columns) where each cell is a tuple (data, model).
-        row_titles (list[str]): Titles for each original row (displayed on the left of the calibration rows).
-        col_titles (list[str]): Titles for each column (displayed on the top).
-        plot_title (str): Overall title for the figure.
-        sharex (bool): Whether to share the x-axis among subplots.
-        sharey (bool): Whether to share the y-axis among subplots.
-        figsize (tuple): Figure size. If None, computed as (n_cols*6, n_rows*6) or adjusted if with_table.
-        with_table (bool): If True, each original row is split into two rows: calibration curve and table.
+        prompt:  Prompt design dict with a ``path`` key.
+        dataset: Dataset dict from the experiment-1 registry.
+        model:   Model dict with an ``id`` key.
 
     Returns:
-        tuple: (fig, axes) matplotlib objects.
+        pd.DataFrame or None: Raw model output, or None if the file is missing.
     """
-    original_n_rows = len(cell_data)
-    n_cols = len(cell_data[0]) if original_n_rows else 0
-    figsize = (n_cols * 6, original_n_rows * (6 + (2.5 if with_table else 0)))
-
-    n_rows = original_n_rows * 2 if with_table else original_n_rows
-    if with_table:
-        # Compute figure height as calibration row height (6) plus table row height (1.8) per original row.
-        # Build height ratios: for each original row, calibration row gets ratio 1 and table row gets 0.15.
-        height_ratios = []
-        for _ in range(original_n_rows):
-            height_ratios.extend([1, 0.15])
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize, sharex=sharex, sharey=sharey,
-                                 gridspec_kw={'height_ratios': height_ratios})
-    else:
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize, sharex=sharex, sharey=sharey)
-
-    # Ensure axes is a 2D array.
-    if n_rows == 1 and n_cols == 1:
-        axes = np.array([[axes]])
-    elif n_rows == 1:
-        axes = np.array([axes])
-    elif n_cols == 1:
-        axes = axes.reshape(n_rows, 1)
-
-    # Loop over grid cells.
-    for i in range(original_n_rows):
-        for j in range(n_cols):
-            try:
-                subplot_ax = axes[2 * i if with_table else i, j]
-                data, model_type = cell_data[i][j]
-                plot_subplot(subplot_ax, data, model_type, ece_in_plot=ece_in_plot)
-            except:
-                print("subplot unplottable")
-                plot_empty(subplot_ax)
-            subplot_ax.set_aspect(1)  # Enforce square aspect ratio.
-            if with_table:
-                table_ax = axes[2 * i + 1, j]
-                plot_table(table_ax, data)
-            # Keep reserved space by making redundant axis labels transparent.
-            if not with_table and not show_axis_labels:
-                if i < n_rows - 1:
-                    subplot_ax.xaxis.label.set_color("none")
-                if j > 0:
-                    subplot_ax.yaxis.label.set_color("none")
-            # Set column header on the top row (if with_table, top row of each pair i.e. when i==0).
-            if i == 0 and not skip_annotation:
-                subplot_ax.set_title(col_titles[j], fontsize=row_col_titles_font_size, fontweight="bold",
-                                     y=1.05)  # col title padding
-        # Set row annotation on the leftmost subplot.
-        if not skip_annotation:
-            front_subplot_ax = axes[2 * i if with_table else i, 0]
-            front_subplot_ax.annotate(
-                row_titles[i],
-                xy=(-0.15, 0.5), xycoords='axes fraction',  # row title padding
-                fontsize=row_col_titles_font_size, fontweight="bold", ha="center", va="center", rotation=90
-            )
-
-    # Add text with absolute offset
-    if plot_title and not skip_annotation:
-        fig.text(0.5, 1.01, plot_title, ha='center', va='bottom', fontsize=title_font_size, fontweight='bold')
-    plt.tight_layout()
-    return plt
+    disk_id = dataset.get("data_path_id", dataset["id"])
+    result_path = prompt["path"] / disk_id / model["id"]
+    try:
+        return CSVDataStore(result_path, "LabelProbExtractor").to_dataframe()
+    except Exception as e:
+        print(f"  [load] missing: {result_path} – {e}")
+        return None
 ```
 
 ```python
-sum_of_token_probs = defaultdict(list)
-```
-
-```python
-def create_full_plot(prompt, datasets, models, chosen_only, normalize_probabilities, with_table, skip_annotation=False,
-                     with_title=True, kwargs=dict(), ece_in_plot=False):
-    """
-    Creates and saves the full plot with subplots for all datasets and models.
-
-    When with_table is True, each dataset row is split into two: the calibration curve (top)
-    and its corresponding table (bottom). Also updates cached_data and sum of token probabilities.
-    """
-    # global cached_data1
-    global cached_data, sum_of_token_probs
-    cell_data = []
-    for dataset in datasets:
-
-        dataset_id = dataset['id']# if dataset['id'] != "MMLU_Physics" else "MMLU"
-        row = []
+raw_data = {}
+for prompt in prompt_designs:
+    pname = prompt["basename"]
+    raw_data[pname] = {}
+    for dataset in all_datasets:
+        ds_id = dataset["id"]
+        raw_data[pname][ds_id] = {}
         for model in models:
+            m_id = model["id"]
+            print(f"Loading {pname}/{ds_id}/{m_id}")
+            raw_data[pname][ds_id][m_id] = load_label_prob_df(prompt, dataset, model)
+```
 
-            key = "chosen_labels" if chosen_only else "all_labels"
-            if key in cached_data['normalized' if normalize_probabilities else 'non-normalized'][prompt["basename"]][
-                dataset_id][model["id"]]:
-                data = cached_data['normalized' if normalize_probabilities else 'non-normalized'][prompt["basename"]][
-            dataset_id][
-                    model["id"]][key]
+```python
+# Optional: persist raw_data to disk for fast reloads
+with open("./cached_raw_data.pkl", "wb") as f:
+    pickle.dump(raw_data, f)
+```
+
+# Data Transformation
+
+Compute calibration metrics from the loaded DataFrames.
+
+`align_predictions_with_ground_truth` aligns each CSV row with the ground-truth
+answer and collects the model's chosen confidence value.
+`compute_calibration_metrics` orchestrates alignment, calibration-curve binning,
+and label-probability summary statistics into a single metrics dict.
+
+`cal_data[norm_key][prompt_basename][dataset_id][model_id][label_key]` → metrics dict
+
+```python
+def align_predictions_with_ground_truth(ground_truth_df, label_prob_df,
+                                        chosen_only=True, normalize=True):
+    """Align model label-probability rows with ground-truth answers.
+
+    Iterates over ``label_prob_df``, skipping rows whose ``id`` has no match in
+    ``ground_truth_df``.  Per row, optionally L1-normalises the probability vector
+    and collects either the single argmax confidence (``chosen_only=True``) or all
+    per-label confidences (``chosen_only=False``).
+
+    Args:
+        ground_truth_df: Ground-truth DataFrame indexed by item id, with a
+                         ``correct_answer`` column (integer label index).
+        label_prob_df:   Model output DataFrame with ``id`` and
+                         ``confidence_per_choice`` columns.
+        chosen_only:     If True, record only the argmax choice per question.
+        normalize:       If True, L1-normalise each per-choice probability vector.
+
+    Returns:
+        tuple:
+            correct (list[bool]):    Whether each recorded prediction is correct.
+            certainties (list[float]): Corresponding confidence values.
+            accuracy (float):        Fraction of all rows where argmax == correct label.
+            invalid_count (int):     Rows where all probabilities are zero
+                                     (only counted when ``chosen_only`` is True).
+    """
+    correct, certainties = [], []
+    n_correct = 0
+    invalid_count = 0
+
+    for _, row in label_prob_df.iterrows():
+        if row["id"] not in ground_truth_df.index:
+            continue
+        mc_task = ground_truth_df.loc[row["id"]]
+        probs = np.array(row["confidence_per_choice"], dtype=float)
+        if normalize and probs.sum() > 0:
+            probs /= probs.sum()
+        chosen = int(np.argmax(probs)) if probs.sum() > 0 else None
+
+        if chosen is not None and chosen == mc_task.correct_answer:
+            n_correct += 1
+
+        if chosen_only:
+            if chosen is None:
+                invalid_count += 1
             else:
-                data = extract_subplot_data(prompt, dataset, model, chosen_only, normalize_probabilities)
-                cached_data['normalized' if normalize_probabilities else 'non-normalized'][prompt["basename"]][
-                    dataset_id][model["id"]][key] = data
-            sum_of_token_probs[model["id"]].append(
-                data["label_prob_sum_mean"]
-            )
-            row.append((data, model["type"]))
-        cell_data.append(row)
+                correct.append(chosen == mc_task.correct_answer)
+                certainties.append(probs[chosen])
+        else:
+            for i, p in enumerate(probs):
+                correct.append(i == mc_task.correct_answer)
+                certainties.append(p)
 
-    row_titles = [ds["id"] for ds in datasets]
-    col_titles = [model["shortname"] for model in models]
+    accuracy = n_correct / len(label_prob_df) if len(label_prob_df) > 0 else 0.0
+    return correct, certainties, accuracy, invalid_count
+```
+
+```python
+def compute_calibration_metrics(ground_truth_df, label_prob_df,
+                                chosen_only=True, normalize=True, n_bins=15):
+    """Compute the full calibration metrics dict for one (prompt, dataset, model) cell.
+
+    Combines alignment, calibration-curve binning, and label-probability summary
+    statistics into a single dict consumed by the visualisation layer.
+
+    Args:
+        ground_truth_df: Ground-truth DataFrame (see :func:`align_predictions_with_ground_truth`).
+        label_prob_df:   Raw model output DataFrame.
+        chosen_only:     Use only the argmax label per question.
+        normalize:       L1-normalise confidence vectors before computing metrics.
+        n_bins:          Number of calibration histogram bins.
+
+    Returns:
+        dict: Keys include ``bin_confidences``, ``bucket_accuracies``,
+              ``bucket_counts``, ``ece``, ``auroc``, ``accuracy``,
+              ``invalid_answers``, ``total_items``, ``normalized_entropy``,
+              and label-probability summary statistics.
+    """
+    correct, certainties, accuracy, invalid_count = align_predictions_with_ground_truth(
+        ground_truth_df, label_prob_df, chosen_only=chosen_only, normalize=normalize
+    )
+    bin_confidences, bucket_accuracies, bucket_counts = calculate_calibration_data(
+        correct, certainties, n_bins
+    )
+    ece = calculate_ece(bin_confidences, bucket_accuracies, bucket_counts)
+    try:
+        auroc = roc_auc_score(correct, certainties)
+    except Exception:
+        auroc = "undefined"
+
+    # Per-question sum-of-label-probabilities statistics (clipped to [0, 1])
+    sum_series = (
+        label_prob_df["confidence_per_choice"]
+        .apply(sum)
+        .apply(lambda v: max(0.0, min(1.0, v)))
+    )
+    metrics = {
+        "is_normalized": normalize,
+        "bin_confidences": bin_confidences,
+        "bucket_accuracies": bucket_accuracies,
+        "bucket_counts": bucket_counts,
+        "ece": ece,
+        "auroc": auroc,
+        "accuracy": accuracy,
+        "label_prob_sum_mean": sum_series.mean(),
+        "label_prob_sum_median": sum_series.quantile(0.5),
+        "label_prob_sum_std": sum_series.std(),
+        "label_prob_sum_iqr": sum_series.quantile(0.75) - sum_series.quantile(0.25),
+        "normalized_entropy": calculate_normalized_entropy(bucket_counts),
+        "total_items": len(label_prob_df),
+        "invalid_answers": invalid_count,
+    }
+    if certainties:
+        metrics["label_prob_median"] = np.median(certainties)
+        metrics["label_prob_iqr"] = (
+                np.percentile(certainties, 75) - np.percentile(certainties, 25)
+        )
+        metrics["average_certainty"] = np.mean(certainties)
+    else:
+        metrics["label_prob_median"] = "undefined"
+        metrics["label_prob_iqr"] = "undefined"
+        metrics["average_certainty"] = "undefined"
+    return metrics
+```
+
+Compute calibration metrics for all combinations of normalisation mode, prompt,
+dataset, model, and label selection. The loop reads exclusively from `raw_data`
+and `all_datasets["df"]`; no additional file reads occur here.
+
+```python
+cal_data = {}
+
+for norm_key, normalize in [("normalized", True), ("non-normalized", False)]:
+    cal_data[norm_key] = {pname: {ds["id"]: {} for ds in all_datasets}
+                          for pname in prompt_basenames}
+    for prompt, dataset, model in product(prompt_designs, all_datasets, models):
+        pname, ds_id, m_id = prompt["basename"], dataset["id"], model["id"]
+        df = raw_data[pname][ds_id][m_id]
+        if df is None:
+            cal_data[norm_key][pname][ds_id][m_id] = {"chosen_labels": None, "all_labels": None}
+            continue
+        cal_data[norm_key][pname][ds_id][m_id] = {}
+        for label_key, chosen_only in [("chosen_labels", True), ("all_labels", False)]:
+            print(f"Computing {norm_key}/{pname}/{ds_id}/{m_id}/{label_key}")
+            try:
+                cal_data[norm_key][pname][ds_id][m_id][label_key] = compute_calibration_metrics(
+                    dataset["df"], df, chosen_only=chosen_only, normalize=normalize
+                )
+            except Exception as e:
+                print(f"  ERROR: {e}")
+                cal_data[norm_key][pname][ds_id][m_id][label_key] = None
+```
+
+```python
+# Optional: persist cal_data to disk for fast reloads
+with open("./cached_data_struct.pkl", "wb") as f:
+    pickle.dump(cal_data, f)
+```
+
+# Data Visualization
+
+## Calibration Subplot Helpers
+
+`make_calibration_subplot_fn` returns a closure matching the
+`plot_subplot_fn(ax, data, model_type)` signature expected by `generate_grid_plot`.
+`render_metrics_table` draws a two-column summary-statistics table on a given Axes.
+
+```python
+def make_calibration_subplot_fn(ece_in_plot=False):
+    """Return a grid-cell rendering function for calibration curves.
+
+    Args:
+        ece_in_plot: If True, annotate the curve with the ECE value.
+
+    Returns:
+        Callable matching ``plot_subplot_fn(ax, data, model_type)``.
+    """
+
+    def render_calibration_subplot(ax, data, model_type):
+        plot_calibration_curve(
+            data["bin_confidences"], data["bucket_accuracies"], data["bucket_counts"],
+            ax=ax, colormap=CALIBRATION_PLOT_COLORS[model_type],
+            fontsize=14, tick_fontsize=10,
+            xlabel="Confidence Bins", ylabel="Accuracy in Bin",
+            ece=data["ece"] if ece_in_plot else None,
+        )
+
+    return render_calibration_subplot
+
+
+def render_metrics_table(ax, data):
+    """Render a per-subplot summary-statistics table on *ax*.
+
+    Displays ECE, AUROC, normalised entropy, invalid-answer count, accuracy,
+    and label-probability statistics in a two-column matplotlib table.
+
+    Args:
+        ax:   The matplotlib Axes to draw on.
+        data: Calibration metrics dict (output of :func:`compute_calibration_metrics`).
+    """
+    table_data = [
+        ["ECE", safe_format(data["ece"])],
+        ["AUROC", safe_format(data["auroc"])],
+        ["Norm. Entropy of Bucket Counts", safe_format(data["normalized_entropy"])],
+        ["Invalid Answer Count", f"{data['invalid_answers']}/{data['total_items']}"],
+        ["Accuracy", safe_format(data["accuracy"])],
+        ["Median of Label Probabilities", safe_format(data["label_prob_median"])],
+        ["IQR of Label Probabilities", safe_format(data["label_prob_iqr"])],
+        ["Median of Sum of Label Probabilities", safe_format(data["label_prob_sum_median"])],
+        ["IQR of Sum of Label Probabilities", safe_format(data["label_prob_sum_iqr"])],
+    ]
+    table = ax.table(cellText=table_data, loc="center", cellLoc="center")
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    for (_, col), cell in table.get_celld().items():
+        if col == 0:
+            cell.PAD = 0.02
+            cell.get_text().set_ha("right")
+            cell.set_width(0.65)
+        elif col == 1:
+            cell.PAD = 0.04
+            cell.get_text().set_ha("left")
+            cell.set_width(0.35)
+    ax.axis("off")
+```
+
+## Full Calibration Grid
+
+`build_calibration_grid` reads pre-computed `cal_data` and assembles a
+dataset × model calibration grid for one (prompt, normalisation, label) combination.
+`save_all_calibration_grids` iterates over all combinations, saves each grid to SVG,
+and closes the figure to free memory.
+
+```python
+def build_calibration_grid(prompt, datasets, models, chosen_only, normalize,
+                           with_table, skip_annotation=False, with_title=True,
+                           ece_in_plot=False, **kwargs):
+    """Build a dataset × model calibration grid for one configuration.
+
+    Reads pre-computed metrics from the module-level ``cal_data`` dict.
+
+    Args:
+        prompt:           Prompt design dict.
+        datasets:         List of dataset dicts (grid rows).
+        models:           List of model dicts (grid columns).
+        chosen_only:      If True, use ``chosen_labels``; otherwise ``all_labels``.
+        normalize:        If True, use the ``normalized`` norm-key.
+        with_table:       If True, render a metrics table below each curve.
+        skip_annotation:  If True, omit row/column title annotations.
+        with_title:       If True, add a descriptive plot title.
+        ece_in_plot:      If True, annotate each curve with its ECE value.
+        **kwargs:         Forwarded to :func:`generate_grid_plot`.
+
+    Returns:
+        The matplotlib.pyplot module after rendering.
+    """
+    norm_key = "normalized" if normalize else "non-normalized"
+    label_key = "chosen_labels" if chosen_only else "all_labels"
+    cell_data = [
+        [
+            (cal_data[norm_key][prompt["basename"]][ds["id"]][m["id"]][label_key],
+             m["type"])
+            for m in models
+        ]
+        for ds in datasets
+    ]
     plot_title = (
         f"Calibration of "
-        f"{'Normalized' if normalize_probabilities else 'Non-Normalized'} "
+        f"{'Normalized' if normalize else 'Non-Normalized'} "
         f"Label Probabilities for {prompt['label']} "
         f"{'(Most Probable Label per Question Only)' if chosen_only else '(All Labels)'}"
+    ) if with_title else None
+    return generate_grid_plot(
+        cell_data,
+        row_titles=[ds["id"] for ds in datasets],
+        col_titles=[m["shortname"] for m in models],
+        plot_subplot_fn=make_calibration_subplot_fn(ece_in_plot=ece_in_plot),
+        plot_table_fn=render_metrics_table if with_table else None,
+        with_table=with_table,
+        skip_annotation=skip_annotation,
+        plot_title=plot_title,
+        **kwargs,
     )
+```
 
-    plot = generate_grid_plot(cell_data, row_titles, col_titles,
-                              with_table=with_table, skip_annotation=skip_annotation,
-                              plot_title=plot_title if with_title else None, ece_in_plot=ece_in_plot, **kwargs)
-    return plot
+```python
+def save_all_calibration_grids(prompt_designs, datasets, models):
+    """Save calibration grid SVGs for all prompt × normalisation × label combinations.
 
+    Each file is named
+    ``cal_plot_prompt{idx}_table{0|1}_chosenonly{0|1}_norm{0|1}_mmlu_physics.svg``
+    and written to `figures_dir / `full_plots/``.
 
-def generate_plots_for_configs(prompt_designs, datasets, models):
-    """Loops over multiple configurations and generates corresponding plots."""
+    Args:
+        prompt_designs: List of prompt design dicts.
+        datasets:       List of dataset dicts (grid rows).
+        models:         List of model dicts (grid columns).
+    """
     for prompt in prompt_designs:
-        variations = list(product([True, False], repeat=3))
-        for chosen_only, with_table, normalize_probabilities in variations:
+        for chosen_only, with_table, normalize in product([True, False], repeat=3):
+            tag = (
+                f"cal_plot_prompt{prompt['idx']}"
+                f"_table{int(with_table)}"
+                f"_chosenonly{int(chosen_only)}"
+                f"_norm{int(normalize)}"
+            )
+            print(f"Generating {prompt['basename']}/{tag}.svg")
             try:
-                print(
-                    "Generating " + f"{prompt['basename']}/cal_plot_prompt{prompt['idx']}_table{int(with_table)}_chosenonly{int(chosen_only)}_norm{int(normalize_probabilities)}.svg")
-                plot = create_full_plot(prompt, datasets, models, chosen_only, normalize_probabilities, with_table,
-                                        with_title=True,
-                                        kwargs={"sharex": False, "sharey": False, "row_col_titles_font_size": 26})
-                # plot.show()
+                plot = build_calibration_grid(
+                    prompt, datasets, models,
+                    chosen_only=chosen_only, normalize=normalize,
+                    with_table=with_table, with_title=True,
+                    row_col_titles_font_size=26,
+                )
                 plot.savefig(
-                    f"resources_struct_decoding/figures/full_plots/cal_plot_prompt{prompt['idx']}_table{int(with_table)}_chosenonly{int(chosen_only)}_norm{int(normalize_probabilities)}_mmlu_physics.svg",
-                    bbox_inches="tight")
+                    figures_dir / "full_plots/{tag}_mmlu_physics.svg",
+                    bbox_inches="tight",
+                )
                 plot.close()
             except Exception as e:
-                print(e)
-                print("Failed to create plot")
+                print(f"  Failed: {e}")
 ```
 
-```python
-# Run full plot generation
-generate_plots_for_configs(prompt_designs, datasets, models)
-```
+Generate and save all calibration grid variants.
 
 ```python
-plot = create_full_plot(
+save_all_calibration_grids(prompt_designs, all_datasets, models)
+```
+
+## Paper Header Plot
+
+A focused calibration grid used as the paper header figure, showing three
+representative datasets and four key models with ECE annotations.
+
+```python
+plot = build_calibration_grid(
     prompt_designs[0],
-    [d for d in datasets if d["id"] in ["MMLU", "GSM8KMC", "GPQA"]],
-    [m for m in models if any(name in m['basename'] for name in
-                              ["Mistral-Small-3", "Magistral-Small-2507-Reasoning-Enabled", "Llama-3",
-                               "Qwen3-30B-A3B"])],
-    chosen_only=True, normalize_probabilities=True,
+    datasets=[d for d in all_datasets if d["id"] in ["MMLU", "GSM8KMC", "GPQA"]],
+    models=[m for m in models if any(name in m["basename"] for name in
+                                     ["Mistral-Small-3", "Magistral-Small-2507-Reasoning-Enabled",
+                                      "Llama-3", "Qwen3-30B-A3B"])],
+    chosen_only=True, normalize=True,
     with_table=False, with_title=False,
     ece_in_plot=True,
-    kwargs={
-        "row_col_titles_font_size": 32,
-        #     "title_font_size": 12,
-    }
+    row_col_titles_font_size=32,
 )
-
-plot.savefig(f"resources_struct_decoding/figures/prompt_1_header_plot.svg", bbox_inches="tight")
+plot.savefig(figures_dir / "prompt_1_header_plot.svg", bbox_inches="tight")
 plot.show()
 ```
 
-# Saving Cached Data
+## Normalization Effect
+
+Side-by-side calibration grids for one model showing the effect of applying
+L1-normalisation to the raw token probabilities.
 
 ```python
-import pickle
-from collections import defaultdict
+def plot_normalization_comparison(model, datasets, prompt):
+    """Plot calibration curves without vs with L1 probability normalisation.
 
+    Rows correspond to the two normalisation modes; columns to datasets.
+    The figure is saved to
+    `figures_dir / `normalization_effect_prompt{idx}_{model_id}.svg``.
 
-def strip_defaultdict(d):
-    if isinstance(d, defaultdict):
-        d = {k: strip_defaultdict(v) for k, v in d.items()}
-    elif isinstance(d, dict):
-        d = {k: strip_defaultdict(v) for k, v in d.items()}
-    return d
-
-
-cached_data_picklable = strip_defaultdict(cached_data)
-
-with open("./cached_data_struct.pkl", "wb") as f:  # "wb" = write binary
-    pickle.dump(dict(cached_data_picklable), f)
-```
-
-# Effect of Normalization
-
-```python
-cached_normalization_data = None
-```
-
-```python
-def generate_normalization_effect_plot(model, datasets, prompt):
-    # global cached_normalization_data
-    row_labels = ["Without Normalization", "With Normalization"]
-    col_titles = [ds["id"] for ds in datasets]
-
-    # Build cell data: each cell is computed for a given normalization setting.
-    cell_data = []
-    # if not cached_normalization_data:
-    for normalize in [False, True]:
-        row = []
-        for dataset in datasets:
-            data = extract_subplot_data(prompt, dataset, model, chosen_only=True, normalize_probabilities=normalize)
-            row.append([data, model["type"]])
-        cell_data.append(row)
-    # cached_normalization_data = cell_data
-
-    # plot_title = f"Normalization Effect for {model['id']}"
-    plot = generate_grid_plot(cell_data, row_labels, col_titles, sharex=False, sharey=False,
-                              with_table=False, show_axis_labels=True, plot_title=None, row_col_titles_font_size=28)
-
+    Args:
+        model:    Model dict to visualise.
+        datasets: List of dataset dicts (one column per dataset).
+        prompt:   Prompt design dict.
+    """
+    cell_data = [
+        [
+            (cal_data["normalized" if normalize else "non-normalized"]
+             [prompt["basename"]][ds["id"]][model["id"]]["chosen_labels"],
+             model["type"])
+            for ds in datasets
+        ]
+        for normalize in [False, True]
+    ]
+    plot = generate_grid_plot(
+        cell_data,
+        row_titles=["Without Normalization", "With Normalization"],
+        col_titles=[ds["id"] for ds in datasets],
+        plot_subplot_fn=make_calibration_subplot_fn(ece_in_plot=False),
+        sharex=False, sharey=False, with_table=False,
+        show_axis_labels=True, plot_title=None,
+        row_col_titles_font_size=28,
+    )
     plot.savefig(
-        f"resources_struct_decoding/figures/normalization_effect_prompt{prompt['idx']}_{model['id']}.svg",
-        bbox_inches="tight")
+        figures_dir / "normalization_effect_prompt{prompt['idx']}_{model['id']}.svg",
+        bbox_inches="tight",
+    )
     plot.show()
-    # plot.close()
+```
 
-
-generate_normalization_effect_plot(
+```python
+plot_normalization_comparison(
     next(m for m in models if "Mistral-Small-3.1-24B-Base-2503" in m["id"]),
-    datasets,
-    prompt_designs[0]
+    all_datasets,
+    prompt_designs[0],
 )
 ```
 
-# RQ 1 Additional Plots
+# Label Bias Analysis
 
+Compute how often each answer-choice position (A/B/C/D) is assigned the highest
+probability by the model, aggregated across all datasets. This reveals systematic
+positional biases that are independent of correctness.
 
-## Label Prob Sum per Prompt
+Only the first prompt design is used here. Label-choice distributions are derived
+from `raw_data` so no additional CSV reads are needed.
 
 ```python
-from matplotlib.legend_handler import HandlerBase
+first_prompt = prompt_designs[0]
 
+# Accumulate normalised probability mass assigned to each label index per model
+labels_chosen_count = defaultdict(lambda: defaultdict(float))
 
-# ---- Custom Legend ----
-class MulticolorPatch(object):
+for model, dataset in product(models, all_datasets):
+    m_id, ds_id = model["id"], dataset["id"]
+    df = raw_data[first_prompt["basename"]][ds_id][m_id]
+    if df is None:
+        continue
+    for _, row in df.iterrows():
+        estimations = np.array(row["confidence_per_choice"], dtype=float)
+        if estimations.sum() != 0:
+            estimations /= estimations.sum()
+        else:
+            estimations[:] = 0.25  # uniform fallback for all-zero rows
+        for i, v in enumerate(estimations):
+            labels_chosen_count[m_id][i] += v
+
+# Normalise accumulated counts to proportions (must sum to 1 per model)
+labels_chosen_proportion = {}
+for m_id, counts in labels_chosen_count.items():
+    total = sum(counts.values())
+    labels_chosen_proportion[m_id] = {label: counts[label] / total for label in range(4)}
+    assert abs(1 - sum(labels_chosen_proportion[m_id].values())) < 1e-6, (
+        f"label proportions do not sum to 1 for {m_id}"
+    )
+```
+
+Compute the ground-truth correct-answer distribution across all datasets to serve
+as a reference baseline for the label-bias comparison.
+
+```python
+actual_correct_label_count = defaultdict(int)
+for dataset in all_datasets:
+    for label, count in dataset["df"]["correct_answer"].value_counts().items():
+        actual_correct_label_count[label] += count
+
+total_gt = sum(actual_correct_label_count.values())
+actual_correct_label_proportion = {i: actual_correct_label_count[i] / total_gt for i in range(4)}
+print("Ground-truth label distribution:", actual_correct_label_proportion)
+```
+
+# Label Probability Sum
+
+Compute the mean and standard deviation of the per-question sum of label
+probabilities for each (model, prompt) pair from pre-computed `cal_data`.
+The sum is expected to be ≈ 1 for well-calibrated models; instruction-tuned
+models often show strong probability mass polarisation.
+
+```python
+# plot_data[model_id][prompt_basename] = (mean, std)
+model_ids = [m["id"] for m in models]
+dataset_id_first = all_datasets[0]["id"]
+
+plot_data = {m_id: {} for m_id in model_ids}
+for prompt, model in product(prompt_designs, models):
+    pname, m_id = prompt["basename"], model["id"]
+    entry = cal_data["normalized"][pname][dataset_id_first][m_id].get("chosen_labels")
+    plot_data[m_id][pname] = (
+        (entry["label_prob_sum_mean"], entry["label_prob_sum_std"]) if entry else (0, 0)
+    )
+```
+
+Grouped bar chart showing mean label-probability sum per model and prompt design.
+Each model type (base / instruct / reasoning) uses a distinct colour family; lighter
+shades distinguish later prompts.
+
+```python
+class MulticolorPatch:
     def __init__(self, colors):
         self.colors = colors
 
 
-class MulticolorPatchHandler(HandlerBase):
+class MulticolorPatchHandler:
     def legend_artist(self, legend, orig_handle, fontsize, handlebox):
         width, height = handlebox.width, handlebox.height
         patches = [
             mpatches.Rectangle(
                 [width / 2 * i - handlebox.xdescent, -handlebox.ydescent],
                 width / 2, height,
-                facecolor=c, edgecolor='black'
-            ) for i, c in enumerate(orig_handle.colors)
+                facecolor=c, edgecolor="black",
+            )
+            for i, c in enumerate(orig_handle.colors)
         ]
         patch_collection = PatchCollection(patches, match_original=True)
         handlebox.add_artist(patch_collection)
         return patch_collection
-```
 
-```python
+
 def lighten_color(color, amount=0.5):
+    """Blend a matplotlib colour towards white by the given amount."""
     c = np.array(to_rgb(color))
     return np.clip(c + (1 - c) * amount, 0, 1)
 
 
-base_instruct = "tab:blue"
-base_base = "tab:orange"
-base_reasoning = "tab:green"
 shades = [0.0, 0.2, 0.4, 0.6]
-
 prompt_colors = {
-    prompt['basename']: {
-        "instruct": lighten_color(base_instruct, amount=shades[i]),
-        "base": lighten_color(base_base, amount=shades[i]),
-        "reasoning": lighten_color(base_reasoning, amount=shades[i])
-    } for i, prompt in enumerate(prompt_designs)
+    prompt["basename"]: {
+        "instruct": lighten_color("tab:blue", amount=shades[i]),
+        "base": lighten_color("tab:orange", amount=shades[i]),
+        "reasoning": lighten_color("tab:green", amount=shades[i]),
+    }
+    for i, prompt in enumerate(prompt_designs)
 }
-
-model_ids = [model["id"] for model in models]
-dataset_id = datasets[0]["id"]
-
-plot_data = {model: {} for model in model_ids}
-for i, prompt in enumerate(prompt_designs):
-    prompt_id = prompt['basename']
-    for model in model_ids:
-        try:
-            metrics = cached_data["normalized"][prompt_id][dataset_id][model]["chosen_labels"]
-            plot_data[model][prompt_id] = (metrics["label_prob_sum_mean"], metrics["label_prob_sum_std"])
-        except KeyError:
-            plot_data[model][prompt_id] = (0, 0)
 ```
 
 ```python
@@ -689,546 +755,221 @@ n_models = len(model_ids)
 n_prompts = len(prompt_designs)
 width = 0.2
 x = np.arange(n_models)
-# plt.rcParams['font.size'] = 18
+
 fig, ax = plt.subplots(figsize=(20, 6))
 
-# for j, prompt in enumerate(prompt_ids):
 for j, prompt in enumerate(prompt_designs):
     offset = (j - (n_prompts - 1) / 2) * width
     for i, model in enumerate(models):
-        mean, std = plot_data[model['id']][prompt['basename']]
+        mean, std = plot_data[model["id"]][prompt["basename"]]
         xpos = x[i] + offset
-        color = prompt_colors[prompt['basename']][model["type"]]
-        ax.bar(xpos, mean, width, yerr=std, capsize=3, color=color, edgecolor='black',
-               label=prompt['basename'] if i == 0 else "")
+        c = prompt_colors[prompt["basename"]][model["type"]]
+        ax.bar(xpos, mean, width, yerr=std, capsize=3, color=c, edgecolor="black",
+               label=prompt["basename"] if i == 0 else "")
 
-# Axis formatting
 ax.set_xticks(x)
 ax.set_xticklabels(model_ids, rotation=45, ha="right", fontsize=14)
 ax.set_ylabel("Label Prob Sum Mean", fontsize=16)
-ax.set_yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
-ax.set_yticklabels([0.0, 0.2, 0.4, 0.6, 0.8, 1.0], fontsize=14)
-# ax.set_title("Influence of Prompt on Label Prob Sum Mean")
+ax.set_yticks(np.arange(0.0, 1.2, 0.2))
+ax.set_yticklabels([f"{v:.1f}" for v in np.arange(0.0, 1.2, 0.2)], fontsize=14)
 ax.set_ylim(0, 1.2)
 ax.set_axisbelow(True)
-ax.yaxis.grid(True)
+ax.grid(axis="y", color="lightgrey", linestyle="--")
+ax.grid(axis="y", which="minor", color="lightgrey", linestyle="--")
 ax.set_yticks(np.arange(0.0, 1.2, 0.1), minor=True)
-ax.grid(axis='y', color='lightgrey', linestyle='--')
-ax.grid(axis='y', which="minor", color='lightgrey', linestyle='--')
 
-legend_entries = []
-legend_labels = []
-for j, prompt in enumerate(prompt_designs):
-    instruct_color = prompt_colors[prompt['basename']]["instruct"]
-    base_color = prompt_colors[prompt['basename']]["base"]
-    patch = MulticolorPatch([instruct_color, base_color])
-    legend_entries.append(patch)
-    legend_labels.append(prompt['label'])
-
-fig.legend(legend_entries, legend_labels,
-           handler_map={MulticolorPatch: MulticolorPatchHandler()},
-           loc='upper center', ncol=n_prompts, title='Prompts',
-           bbox_to_anchor=(0.5, 1.05), fontsize=12, title_fontsize=14)
-
+legend_entries = [
+    MulticolorPatch([prompt_colors[p["basename"]]["instruct"],
+                     prompt_colors[p["basename"]]["base"]])
+    for p in prompt_designs
+]
+legend_labels = [p["label"] for p in prompt_designs]
+fig.legend(
+    legend_entries, legend_labels,
+    handler_map={MulticolorPatch: MulticolorPatchHandler()},
+    loc="upper center", ncol=n_prompts, title="Prompts",
+    bbox_to_anchor=(0.5, 1.05), fontsize=12, title_fontsize=14,
+)
 plt.tight_layout(rect=[0, 0, 1, 0.95])
-plt.draw()
-plt.savefig("resources_struct_decoding/figures/label_prob_calibration.svg", bbox_inches="tight")
-plt.savefig("resources_struct_decoding/figures/label_prob_calibration.png", bbox_inches="tight")
+plt.savefig(figures_dir / "label_prob_calibration.svg", bbox_inches="tight")
+plt.savefig(figures_dir / "label_prob_calibration.png", bbox_inches="tight")
 plt.show()
 ```
 
-# Table on the influence of prompt design on label prob sum
+# LaTeX Tables
+
+Count invalid answers (questions where the model assigns zero probability to all
+choices) per model and prompt directly from `raw_data`, avoiding any additional
+file reads.
 
 ```python
-import numpy as np
+invalid_answers_counter = defaultdict(lambda: defaultdict(int))
+for model, prompt, dataset in product(models, prompt_designs, all_datasets):
+    m_id, pname, ds_id = model["id"], prompt["basename"], dataset["id"]
+    df = raw_data[pname][ds_id][m_id]
+    if df is not None:
+        count = df["confidence_per_choice"].apply(lambda x: sum(x) <= 0).sum()
+        invalid_answers_counter[m_id][pname] += count
+```
 
-# ---- Data Aggregation ----
+## Label Probability Sum by Model Type and Prompt
 
-# Initialize accumulators for base and instruction-tuned models
-prompt_ids = [prompt['basename'] for prompt in prompt_designs]
+Aggregate mean label-probability sum per model *type* (base, instruct, reasoning)
+across all models of that type, then write a LaTeX table.
 
-means = {
-    key: {prompt: [] for prompt in prompt_ids} for key in ["base", "instruct", "reasoning"]
+```python
+means_by_type = {
+    key: {pname: [] for pname in prompt_basenames}
+    for key in ["base", "instruct", "reasoning"]
 }
-stds = {
-    key: {prompt: [] for prompt in prompt_ids} for key in ["base", "instruct", "reasoning"]
-}
+for model, pname in product(models, prompt_basenames):
+    mean, _ = plot_data[model["id"]][pname]
+    means_by_type[model["type"]][pname].append(mean)
 
-for prompt in prompt_ids:
-    for model in models:
-        mean, std = plot_data[model["id"]][prompt]
-        means[model["type"]][prompt].append(mean)
-        stds[model["type"]][prompt].append(std)
+table_rows = {"Base Models": {}, "Instruction Tuned Models": {}, "Reasoning Models": {}, "Average": {}}
+for pname in prompt_basenames:
+    agg = {t: np.mean(means_by_type[t][pname]) if means_by_type[t][pname] else 0
+           for t in ["base", "instruct", "reasoning"]}
+    agg["avg"] = statistics.fmean(agg.values())
+    table_rows["Base Models"][pname] = f"{agg['base']:.4f}"
+    table_rows["Instruction Tuned Models"][pname] = f"{agg['instruct']:.4f}"
+    table_rows["Reasoning Models"][pname] = f"{agg['reasoning']:.4f}"
+    table_rows["Average"][pname] = f"{agg['avg']:.4f}"
 
-# Compute aggregated values
-table_data = {"Base Models": {}, "Instruction Tuned Models": {}, "Reasoning Models": {}, "Average": {}}
-
-model_types = ["base", "instruct", "reasoning"]
-
-for prompt in prompt_ids:
-    # Compute means
-    aggregate_means = {
-        type: np.mean(means[type][prompt]) if means[type][prompt] else 0 for type in model_types
-    }
-    aggregate_means['avg'] = statistics.fmean(aggregate_means.values())
-
-    # Compute std deviations correctly
-    # base_std = np.sqrt(np.sum(np.square(stds["base"][prompt]))) if stds["base"][prompt] else 0
-    # instruct_std = np.sqrt(np.sum(np.square(stds["instruct"][prompt]))) if stds["instruct"][prompt] else 0
-    # avg_std = np.sqrt((base_std ** 2 + instruct_std ** 2) / 2)  # Combine stds for average row
-
-    # Store formatted results
-    table_data["Base Models"][prompt] = f"{aggregate_means['base']:.4f}"  # ± {base_std:.4f}
-    table_data["Instruction Tuned Models"][prompt] = f"{aggregate_means['instruct']:.4f}"  # ± {instruct_std:.4f}
-    table_data["Reasoning Models"][prompt] = f"{aggregate_means['reasoning']:.4f}"  # ± {instruct_std:.4f}
-    table_data["Average"][prompt] = f"{aggregate_means['avg']:.4f}"  # ± {avg_std:.4f}
-
-# ---- Generate LaTeX Table ----
-
-latex_table = """
-\\begin{table}[h]
-    \\centering
-    \\begin{tabular}{lcccc}
-        \\toprule
-        & Prompt 1 & Prompt 2 & Prompt 3 & Prompt 4 \\\\
-        \\midrule
-"""
-
-for row_name, values in table_data.items():
-    row_values = " & ".join(values[prompt] for prompt in prompt_ids)
+latex_table = (
+    "\n\\begin{table}[h]\n"
+    "    \\centering\n"
+    "    \\begin{tabular}{lcccc}\n"
+    "        \\toprule\n"
+    "        & Prompt 1 & Prompt 2 & Prompt 3 & Prompt 4 \\\\\n"
+    "        \\midrule\n"
+)
+for row_name, values in table_rows.items():
+    row_values = " & ".join(values[pname] for pname in prompt_basenames)
     latex_table += f"        {row_name} & {row_values} \\\\\n"
+latex_table += (
+    "        \\bottomrule\n"
+    "    \\end{tabular}\n"
+    "    \\caption{Mean over Sum of Label Probabilities per Question for Base and Instruction Tuned Models}\n"
+    "    \\label{tab:labelprobsum}\n"
+    "\\end{table}\n"
+)
 
-latex_table += """        \\bottomrule
-    \\end{tabular}
-    \\caption{Mean over Sum of Label Probabilities per Question for Base and Instruction Tuned Models}
-    \\label{tab:labelprobsum}
-\\end{table}
-"""
-
-with open("resources_struct_decoding.sav/tables/prompt_design_label_prob_sum.tex", "w", encoding="utf-8") as f:
+with open(tables_dir / "prompt_design_label_prob_sum.tex", "w", encoding="utf-8") as f:
     f.write(latex_table)
 print(latex_table)
 ```
 
-Table showing impact of prompt design on ECE
+## ECE by Prompt Design
+
+Per-dataset, per-model ECE values across all prompt designs, with mean and
+max–min deviation columns.
 
 ```python
-import numpy as np
-
-property = "ece"
-
-# ---- Data Extraction ----
-table_data = {}
+prop = "ece"
+table_data_ece = {}
 dataset_stats = {}
 
-for dataset in datasets:
-    dataset_id = dataset["id"]
-    table_data[dataset_id] = {}
+for dataset in all_datasets:
+    ds_id = dataset["id"]
+    table_data_ece[ds_id] = {}
+    deviations, means_list = [], []
 
-    deviations = []
-    means = []
-
-    for model in model_ids:
+    for model in models:
+        m_id = model["id"]
         prop_list = []
-        table_data[dataset_id][model] = {}
+        table_data_ece[ds_id][m_id] = {}
 
-        for prompt in prompt_paths:
+        for pname in prompt_basenames:
             try:
-                value = cached_data["normalized"][prompt][dataset_id][model][
-                    "all_labels" if property == "calibration_gap" else "chosen_labels"
-                ][property]
-            except KeyError:
-                value = 0  # Default to 0 if missing
-            table_data[dataset_id][model][prompt] = value
+                value = cal_data["normalized"][pname][ds_id][m_id]["chosen_labels"][prop]
+            except (KeyError, TypeError):
+                value = 0
+            table_data_ece[ds_id][m_id][pname] = value
             prop_list.append(value)
 
-        # Compute Mean & Deviation
         mean_value = np.mean(prop_list)
         deviation = np.std(prop_list)
-
-        table_data[dataset_id][model]["Mean"] = mean_value
-        table_data[dataset_id][model]["Deviation"] = deviation
-        means.append(mean_value)
+        table_data_ece[ds_id][m_id]["Mean"] = mean_value
+        table_data_ece[ds_id][m_id]["Deviation"] = deviation
+        means_list.append(mean_value)
         deviations.append(deviation)
 
-    # Compute dataset-level stats
-    dataset_stats[dataset_id] = {
+    dataset_stats[ds_id] = {
         "mean_deviation": np.mean(deviations),
         "std_deviation": np.std(deviations),
-        "mean_mean": np.mean(means)
+        "mean_mean": np.mean(means_list),
     }
 
-# ---- Generate LaTeX Table ----
-
-latex_table = f"""
-\\begin{{table}}[h]
-    \\centering
-    \\makebox[\\textwidth][c]{{%
-    \\begin{{tabular}}{{l|lcccc|cc}}
-        \\toprule
-        Dataset & Model & Prompt 1 & Prompt 2 & Prompt 3 & Prompt 4 & Mean & max-min \\\\
-        \\midrule
-"""
-
-for dataset_id, model_ids in table_data.items():
+latex_ece = (
+    f"\n\\begin{{table}}[h]\n"
+    f"    \\centering\n"
+    f"    \\makebox[\\textwidth][c]{{%\n"
+    f"    \\begin{{tabular}}{{l|lcccc|cc}}\n"
+    f"        \\toprule\n"
+    f"        Dataset & Model & Prompt 1 & Prompt 2 & Prompt 3 & Prompt 4 & Mean & max-min \\\\\n"
+    f"        \\midrule\n"
+)
+for ds_id, models_ece in table_data_ece.items():
     first_row = True
-
-    for model, prop_values in model_ids.items():
-        row_values = " & ".join(f"{prop_values[prompt]:.4f}" for prompt in prompt_paths)
+    for model_id, prop_values in models_ece.items():
+        row_values = " & ".join(f"{prop_values[pname]:.4f}" for pname in prompt_basenames)
         mean_value = f"{prop_values['Mean']:.4f}"
-        deviation = f"{prop_values['Deviation']:.4f}"
-        prop_values_prompts = [prop_values[prompt] for prompt in prompt_paths]
-        max_minus_min = f"{max(prop_values_prompts) - min(prop_values_prompts):.4f}"
-
+        prop_list = [prop_values[pname] for pname in prompt_basenames]
+        max_minus_min = f"{max(prop_list) - min(prop_list):.4f}"
         if first_row:
-            latex_table += f"        \\multirow{{{len(model_ids)}}}{{*}}{{{dataset_id}}} & {model} & {row_values} & {mean_value} & {max_minus_min} \\\\\n"
+            latex_ece += (f"        \\multirow{{{len(models_ece)}}}{{*}}{{{ds_id}}} "
+                          f"& {model_id} & {row_values} & {mean_value} & {max_minus_min} \\\\\n")
             first_row = False
         else:
-            latex_table += f"        & {model} & {row_values} & {mean_value} & {max_minus_min} \\\\\n"
+            latex_ece += f"        & {model_id} & {row_values} & {mean_value} & {max_minus_min} \\\\\n"
+    latex_ece += "        \\midrule\n"
 
-    latex_table += "        \\midrule\n"
-
-# ---- Compute Overall Caption Statistics ----
-
-caption_stats = []
-for dataset_id, stats in dataset_stats.items():
-    mean_dev = f"{stats['mean_deviation']:.4f}"
-    std_dev = f"{stats['std_deviation']:.4f}"
-    mean_mean = f"{stats['mean_mean']:.4f}"
-    caption_stats.append(
-        f"{dataset_id}: $\\mu_{{dev}}$={mean_dev}, $\\sigma_{{dev}}$={std_dev}, $\\mu_{{mean}}$={mean_mean}")
-
-caption_text = " ".join(caption_stats)
-
-# ---- Finalize Table ----
-
-property_name = "ECE" if property == "ece" else "Calibration Gap"
-
-latex_table += f"""        \\bottomrule
-    \\end{{tabular}}
-    }}
-    \\caption{{{property_name} Across Prompts {"(using Probability for all Labels)" if property == "calibration_gap" else "(using Probability of chosen Labels only)"} with Mean and Deviation for each Dataset. Dataset-level statistics: {caption_text}.}}
-    \\label{{tab:{property}}}
-\\end{{table}}
-"""
-
-print(latex_table)
-with open(f"prompt_design_{property}.tex", "w", encoding="utf-8") as f:
-    f.write(latex_table)
-```
-
-### Label Probability Deviation
-
-```python
-invalid_answers_counter = defaultdict(lambda: defaultdict(lambda: 0))  # [model][prompt]
-
-for model in models:
-    for i, prompt in enumerate(prompt_designs):
-
-        for dataset in datasets:
-            dataframes = dict()
-            result_path = prompt['path'] / dataset["id"] / model["id"]
-            label_prob_df = CSVDataStore(result_path, "LabelProbExtractor").to_dataframe()
-            invalid_count = (label_prob_df["confidence_per_choice"]
-                             .apply(lambda x: sum(x) <= 0)
-                             .sum())
-            invalid_answers_counter[model['id']][prompt['basename']] += invalid_count
-
-print("invalid_answers_counter", invalid_answers_counter)
-```
-
-```python
-from collections import defaultdict
-
-# Extract model names
-prompts = [f"Prompt {i + 1}" for i in range(len(prompt_paths))]
-
-# Generate LaTeX Table
-latex_table = "\\begin{table}[h]\n\\centering\n"
-latex_table += "\\begin{tabular}{lcccc}\n\\hline\n"
-latex_table += "Model & " + " & ".join(prompts) + " \\\\\n\\hline\n"
-
-for model in list(invalid_answers_counter.keys()):
-    row_data = [str(invalid_answers_counter[model].get(p['basename'], 0)) for p in prompt_designs]
-    latex_table += f"{model} & " + " & ".join(row_data) + " \\\\\n"
-
-latex_table += "\\hline\n\\end{tabular}\n"
-latex_table += "\\caption{Number of invalid answers given by models for different prompts across all datasets (n=25316). Invalid answers dont assign any probability mass to the answer choice labels.}\n"
-latex_table += "\\label{tab:invalid_answers}\n"
-latex_table += "\\end{table}"
-
-print(latex_table)
-with open(f"resources_struct_decoding.sav/tables/invalid_answers.tex", "w", encoding="utf-8") as f:
-    f.write(latex_table)
-```
-
-### Label Bias
-Label Bias immernoch vorhanden
-Dazu Plot machen: für den gewählten Prompt
-Pro modell
-aufsummiert über Datensätze Gegenüberstellen A/B/C/D prozentuale verteilung im Datensatz und prozentuale Verteilung an "meistgewählten" (argmax normalized probabilities) Label
-
-
-```python
-prompt = prompt_designs[0]
-
-labels_chosen_count = defaultdict(lambda: defaultdict(lambda: 0))
-labels_chosen_proportion = defaultdict(lambda: defaultdict(lambda: 0))
-
-for model in models:
-    for dataset in datasets:
-        result_path = f"{prompt['path']}/{dataset['id']}/{model['id']}"
-        label_prob_df = CSVDataStore(result_path, "LabelProbExtractor").to_dataframe()
-        for i in range(len(label_prob_df)):
-            row = label_prob_df.iloc[i]
-            estimations = np.array(row["confidence_per_choice"])
-            if sum(estimations) != 0:
-                estimations /= sum(estimations)
-                for i in range(len(estimations)):
-                    labels_chosen_count[model["id"]][i] += estimations[i]
-            else:
-                for i in range(len(estimations)):
-                    labels_chosen_count[model["id"]][i] += 0.25
-        del label_prob_df
-    total_items = sum(labels_chosen_count[model["id"]].values())
-    print("total items=", total_items)
-    for label in range(4):
-        labels_chosen_proportion[model["id"]][label] = labels_chosen_count[model["id"]][label] / total_items
-    assert (1 - sum(labels_chosen_count[model["id"]].values())) < 0.001
-
-actual_correct_label_count = defaultdict(lambda: 0)
-actual_correct_label_proportion = defaultdict(lambda: 0)
-
-for dataset in datasets:
-    value_counts = dataset["data_source"]().df["correct_answer"].value_counts().to_dict()
-    for i, val in value_counts.items():
-        actual_correct_label_count[i] += val
-
-total_items = sum(actual_correct_label_count.values())
-print("total items=", total_items)
-
-for i in range(4):
-    actual_correct_label_proportion[i] = actual_correct_label_count[i] / total_items
-```
-
-```python
-models
-```
-
-```python
-import numpy as np
-import matplotlib.pyplot as plt
-
-# ---- Data Setup ----
-labels = ["A", "B", "C", "D"]
-num_labels = len(labels)
-
-# Extract ground truth distribution
-ground_truth = [actual_correct_label_proportion[i] for i in range(num_labels)]
-
-# Extract model distributions
-model_ids = list(labels_chosen_proportion.keys())
-model_distributions = {
-    model_id: [labels_chosen_proportion[model_id][i] for i in range(num_labels)]
-    for model_id in model_ids
-}
-
-# Categorize models
-categories = {
-    "instruct": ("Blues", [m["id"] for m in models if m["type"] == "instruct"]),
-    "base": ("Oranges", [m["id"] for m in models if m["type"] == "base"]),
-    "reasoning": ("Greens", [m["id"] for m in models if m["type"] == "reasoning"]),
-}
-
-# Assign colors
-model_colors = {}
-for cmap, ids in [(plt.cm.get_cmap(c[0]), c[1]) for c in categories.values()]:
-    colors = cmap(np.linspace(0.4, 0.8, len(ids)))
-    model_colors.update({model: colors[i] for i, model in enumerate(ids)})
-
-ground_truth_color = "lightgrey"
-
-# ---- Plotting ----
-fig, ax = plt.subplots(figsize=(20, 6))
-bar_width = 0.04
-x = np.arange(num_labels)
-
-# Plot Ground Truth
-ax.bar(
-    x - bar_width * (len(models) / 2),
-    ground_truth,
-    bar_width,
-    label="Ground Truth",
-    color=ground_truth_color,
-    edgecolor="black",
-)
-
-# Plot models
-for i, model_id in enumerate(model_ids):
-    ax.bar(
-        x - bar_width * (len(model_ids) / 2) + (i + 1) * bar_width,
-        model_distributions[model_id],
-        bar_width,
-        label=model_id,
-        color=model_colors[model_id],
-        edgecolor="black",
-    )
-
-# ---- Add ground truth reference lines ----
-for i, gt in enumerate(ground_truth):
-    ax.hlines(
-        y=gt,
-        xmin=x[i] - bar_width * (len(model_ids) / 2 + 1),
-        xmax=x[i] + bar_width * (len(model_ids) / 2 + 1),
-        colors="black",
-        linestyles="dashed",
-        alpha=0.5,
-    )
-
-# ---- Formatting ----
-ax.set_xticks(x, labels, fontsize=14)
-ax.set_yticks(np.arange(0.0, 0.7 + 0.1, 0.1))
-ax.set_yticklabels([round(v, 1) for v in np.arange(0.0, 0.7 + 0.1, 0.1)], fontsize=12)
-ax.tick_params(axis="x", pad=10)
-ax.set_ylabel("Proportion", fontsize=14)
-ax.set_ylim(0, 0.7)
-
-# ---- Legend ----
-handles = [plt.Rectangle((0, 0), 1, 1, color=ground_truth_color, edgecolor="black")]
-handles += [
-    plt.Rectangle((0, 0), 1, 1, color=model_colors[m], edgecolor="black")
-    for m in model_ids
+caption_parts = [
+    f"{ds_id}: $\\mu_{{dev}}$={stats['mean_deviation']:.4f}, "
+    f"$\\sigma_{{dev}}$={stats['std_deviation']:.4f}, "
+    f"$\\mu_{{mean}}$={stats['mean_mean']:.4f}"
+    for ds_id, stats in dataset_stats.items()
 ]
-labels_legend = ["Ground Truth"] + model_ids
-ax.legend(
-    handles, labels_legend,
-    loc="center left",  # anchor legend to the left-center of its box
-    bbox_to_anchor=(1.01, 0.5),  # place that box just outside the axes
-    fontsize=14
+latex_ece += (
+    "        \\bottomrule\n"
+    "    \\end{tabular}\n"
+    "    }\n"
+    f"    \\caption{{ECE Across Prompts (using Probability of chosen Labels only) "
+    f"with Mean and Deviation for each Dataset. Dataset-level statistics: {' '.join(caption_parts)}. }}\n"
+    "    \\label{tab:ece}\n"
+    "\\end{table}\n"
 )
 
-plt.tight_layout()
-plt.savefig("resources_struct_decoding/figures/label_bias_estimations.svg", bbox_inches="tight")
-plt.savefig("resources_struct_decoding/figures/label_bias_estimations.png", bbox_inches="tight")
-plt.show()
+print(latex_ece)
+with open(tables_dir / "prompt_design_ece.tex", "w", encoding="utf-8") as f:
+    f.write(latex_ece)
 ```
 
-# Reasoning Chain Lengths
+## Invalid Answers by Model and Prompt
+
+Number of questions per model per prompt where no probability mass was assigned to
+any answer choice, aggregated across all datasets.
 
 ```python
-reasoning_models = [m for m in models if m["type"] == "reasoning"]
-reasoning_models
-```
+latex_invalid = (
+        "\\begin{table}[h]\n\\centering\n"
+        "\\begin{tabular}{l" + "c" * len(prompt_designs) + "}\n\\hline\n"
+        + "Model & " + " & ".join(f"Prompt {p['idx']}" for p in prompt_designs) + " \\\\\n\\hline\n"
+)
+for model in models:
+    row_data = [str(invalid_answers_counter[model["id"]].get(p["basename"], 0))
+                for p in prompt_designs]
+    latex_invalid += f"{model['id']} & " + " & ".join(row_data) + " \\\\\n"
+latex_invalid += (
+    "\\hline\n\\end{tabular}\n"
+    "\\caption{Number of invalid answers given by models for different prompts across all datasets. "
+    "Invalid answers do not assign any probability mass to the answer choice labels.}\n"
+    "\\label{tab:invalid_answers}\n"
+    "\\end{table}"
+)
 
-```python
-for model in reasoning_models:
-    for dataset in datasets:
-        result_path = f"data_struct_dec/data_prompt_1/{dataset['id']}/{model['id']}"
-        label_prob_df = CSVDataStore(result_path, "LabelProbExtractor").to_dataframe()
-        label_prob_df["amount_answer_tokens"]  # this is the column that holds answer tokens
-
-```
-
-```python
-reasoning_models
-```
-
-```python
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import numpy as np
-
-# 1. Structure the data specifically for Matplotlib
-# We need a dictionary where keys = dataset_ids and values = list of arrays (one per model)
-grouped_data = {d['id']: [] for d in datasets}
-model_labels = []
-
-for model in reasoning_models:
-    model_labels.append(model['shortname'] if 'shortname' in model else model['basename'])
-
-    for dataset in datasets:
-        try:
-            result_path = f"data_struct_dec/data_prompt_1/{dataset['id']}/{model['id']}"
-            label_prob_df = CSVDataStore(result_path, "LabelProbExtractor").to_dataframe()
-
-            # Collect the raw list of numbers
-            # Select the column
-            series = label_prob_df["amount_answer_tokens"]
-
-            # Keep only values <= 10240, drop NAs, then convert to list
-            data_values = series[series <= 10240].dropna().tolist()
-            grouped_data[dataset['id']].append(data_values)
-
-        except Exception as e:
-            # Handle missing data gracefully by appending empty list or handling error
-            print(f"Error loading {model['id']}/{dataset['id']}: {e}")
-            grouped_data[dataset['id']].append([])
-
-# 2. Setup Plotting Variables
-num_models = len(reasoning_models)
-num_datasets = len(datasets)
-x_indexes = np.arange(num_models)  # [0, 1, 2, ...]
-bar_width = 0.15  # Width of each box
-colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # 4 Distinct colors (Blue, Orange, Green, Red)
-
-fig, ax = plt.subplots(figsize=(12, 6))
-
-# 3. Iterate through datasets and plot them with offsets
-legend_handles = []
-
-for i, dataset in enumerate(datasets):
-    # Calculate offset positions
-    # Formula centers the group around the x_index
-    positions = x_indexes + (i - (num_datasets - 1) / 2) * bar_width
-
-    # Get the data for this specific dataset across all models
-    data_to_plot = grouped_data[dataset['id']]
-
-    # Create the boxplot
-    # patch_artist=True allows us to fill the box with color
-    bp = ax.boxplot(
-        data_to_plot,
-        positions=positions,
-        widths=bar_width,
-        patch_artist=True,
-        showfliers=False  # Optional: Hide outliers for cleaner look
-    )
-
-    # Color the boxes and create legend handle
-    current_color = colors[i % len(colors)]
-    for box in bp['boxes']:
-        box.set_facecolor(current_color)
-        box.set_alpha(0.8)  # Slight transparency
-
-        # Make the median line black for visibility
-    for median in bp['medians']:
-        median.set_color('black')
-
-    # Create a manual legend entry
-    legend_handles.append(mpatches.Patch(color=current_color, label=dataset['id']))
-
-# 4. Final Formatting
-ax.set_xticks(x_indexes)
-ax.set_xticklabels(model_labels)
-ax.set_xlabel("Reasoning Model")
-ax.set_ylabel("Amount of Reasoning Tokens")
-ax.set_title("Reasoning Tokens Distribution by Reasoning Model and Dataset")
-plt.xticks(rotation=45, ha='right')
-
-# Add the legend using our custom handles
-ax.legend(handles=legend_handles, title="Dataset")
-
-ax.grid(axis='y', linestyle='--', alpha=0.5)
-plt.tight_layout()
-for extension in ["svg", "pdf"]:
-    plt.savefig(f"resources_struct_decoding/figures/label_probability_reasoning_lengths.{extension}", bbox_inches="tight")
-plt.show()
-```
-
-```python
-
-```
-
-```python
-
+print(latex_invalid)
+with open(tables_dir / "invalid_answers.tex", "w", encoding="utf-8") as f:
+    f.write(latex_invalid)
 ```
