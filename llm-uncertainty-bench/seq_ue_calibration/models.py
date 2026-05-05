@@ -1,4 +1,6 @@
 import random
+import os
+import re
 
 DEFAULTS = {
     # assumes 4x A100 available
@@ -233,7 +235,7 @@ MODELS = [
     },
     {
         "name": "google/gemma-3-27b-it",
-        "shortname": "google/gemma-3-27b",
+        "shortname": "gemma-3-27b",
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
         "type": "instruct",
@@ -245,4 +247,7 @@ MODELS = [
 for model in MODELS:
     provider, basename = model["name"].split("/", 1)
     if "basename" not in model:
-        model["basename"] = basename
+        model["basename"] = os.path.basename(model["name"])
+    if "shortname" not in model:
+        model["shortname"] = re.sub(r"(\-\d+|\-v\d.\d)$", "", model["basename"])
+    model.setdefault("id", model['basename'])

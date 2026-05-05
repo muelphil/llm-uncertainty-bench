@@ -1,721 +1,1 @@
----
-jupyter:
-  jupytext:
-    formats: ipynb,md
-    text_representation:
-      extension: .md
-      format_name: markdown
-      format_version: '1.3'
-      jupytext_version: 1.18.1
-  kernelspec:
-    display_name: Python 3 (ipykernel)
-    language: python
-    name: python3
----
-
-# Imports
-
-```python
-%load_ext autoreload
-%autoreload 2
-
-import json
-import os
-import re
-from collections import defaultdict
-import numpy as np
-
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from async_graph_bench.stores import CSVDataStore, DiskCacheStore
-from functools import reduce
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import (
-    precision_recall_fscore_support,
-    accuracy_score,
-    confusion_matrix,
-)
-```
-
-```python
-import sys
-from pathlib import Path
-
-project_root = Path().resolve().parent
-sys.path.insert(0, str(project_root / "calibration_visualization"))
-sys.path.insert(0, str(project_root / "shared"))
-sys.path.insert(0, str(Path().resolve()))
-```
-
-```python
-from calculate_calibration_data import calculate_calibration_data_discrete
-from ece import calculate_ece
-from normalized_entropy import calculate_normalized_entropy
-from plot_calibration_curve import plot_calibration_curve
-
-from config import CALIBRATION_PLOT_COLORS, apply_matplotlib_defaults
-from datasets_exp2 import (
-    arithmetic_datasets,
-    arithmetic_datasets_dict,
-    datasets,
-    datasets_combined,
-    mc_datasets,
-    mc_datasets_dict,
-)
-from generate_grid_plot import generate_grid_plot
-from models import MODELS
-from numpy_utils import NumpyEncoder
-from plot_empty import plot_empty
-```
-
-# Configuration
-
-```python
-# Timestamped print helper (used throughout to track long-running loops)
-from analysis_utils.misc_utils import print_with_time, extract_number
-
-# Colour blending utility (lighten/darken named colours; used for bar-chart fill colours)
-from analysis_utils.color_utils import adjust_color, scale_fonts
-```
-
-```python
-apply_matplotlib_defaults()
-
-data_base_path = Path(".\\data")
-resources_dir = Path(".\\resources")
-figures_dir = resources_dir / "figures"
-tables_dir = resources_dir / "tables"
-
-for d in [resources_dir, figures_dir, tables_dir]:
-    os.makedirs(d, exist_ok=True)
-
-color = {
-    "instruct": adjust_color("tab:blue", 0.7, lighten=True),
-    "reasoning": adjust_color("tab:green", 0.7, lighten=True),
-}
-```
-
-# Model and Dataset Selection
-
-```python
-for model in MODELS:
-    model.setdefault("id", model.get("basename", os.path.basename(model["name"])))
-    if "basename" not in model:
-        model["basename"] = os.path.basename(model["name"])
-    if "shortname" not in model:
-        model["shortname"] = re.sub(r"(\-\d+|\-v\d.\d)$", "", model["basename"])
-
-models = [
-    m for m in MODELS
-    if m["type"] in ["instruct", "reasoning"] and "Magistral" not in m["name"]
-]
-
-[m["shortname"] for m in models]
-```
-
-Metrics to evaluate. ``n_bins`` controls calibration-plot bucket granularity.
-Frequency of Answer uses 11 bins (its scores are discrete multiples of 0.1);
-all other uq methods use 15.
-
-```python
-uq_methods = [
-    {"label": "Verbalized Uncertainty", "id": "verbalized",         "type": "certainty", "n_bins": 15},
-    {"label": "P(True)",                "id": "p_true",             "type": "certainty", "n_bins": 15},
-    {"label": "Frequency of Answer",    "id": "frequency_of_answer","type": "certainty", "n_bins": 11},
-    {"label": "CCP",                    "id": "ccp",                "type": "certainty", "n_bins": 15},
-]
-```
-
-# Data Loading
-
-```python
-def get_merged_dataset(directory):
-    """Load and merge all per-item estimations for a given benchmark output directory.
-
-    Merges AnsweredCorrectly, ClaimConditionedProbability, PTrueOriginal, and
-    Verbalized2SUEExtractor output files on (id, iter).
-
-    Args:
-        directory: Path string to the model/dataset output directory.
-
-    Returns:
-        pd.DataFrame: Merged DataFrame with columns is_correct, ccp, p_true, verbalized.
-    """
-    answered_correctly_df = (DiskCacheStore if "SciBench" in directory else CSVDataStore)(
-        directory, "AnsweredCorrectly"
-    ).to_dataframe()
-    
-    claim_prob_df, p_true_df, verbalized_df = [
-        CSVDataStore(directory, src).to_dataframe().rename(columns={"estimations": name})
-        for name, src in [
-            ("ccp", "ClaimConditionedProbability"),
-            ("p_true", "PTrueOriginal"),
-            ("verbalized", "Verbalized2SUEExtractor"),
-        ]
-    ]
-    dfs = [answered_correctly_df, claim_prob_df, p_true_df, verbalized_df]
-    print(f"\t\t{'/'.join(str(len(d)) for d in dfs)}")
-    lengths = [len(df) for df in dfs]
-    merged_df = reduce(
-        lambda left, right: pd.merge(left, right, on=["id", "iter"], how="inner"),
-        dfs,
-    )
-    assert len(merged_df) == min(lengths) and len(merged_df) != 0, "Merge failed!"
-    return merged_df
-```
-
-```python
-# Filters out rows with failed answer extraction; counts unique answers per question ID
-from analysis_utils.dataframe_utils import filter_valid_answers, unique_count_distribution
-```
-
-```python
-# data[dataset_id][model_id] = merged DataFrame
-data = {}
-
-for dataset in datasets:
-    dataset_id = dataset["id"]
-    data[dataset_id] = {}
-    print(f"Loading data for dataset {dataset_id} per model...")
-    for model in models:
-        print(f"\tLoading model {model['basename']}...")
-        data[dataset_id][model["id"]] = get_merged_dataset(
-            f"{data_base_path}/{dataset_id}/{model['basename']}"
-        )
-```
-
-```python
-data["MMLU"][models[0]["id"]].columns
-```
-
-# Data Transformation
-
-## Arithmetic Answer Distribution
-
-```python
-def compute_arithmetic_metrics(df, dataset_id):
-    # overall accuracy
-    accuracy = float(df["is_correct"].mean())
-
-    # per-question correctness
-    counts = df.groupby("id")["is_correct"].sum()
-    totally_correct = int((counts == 10).sum())
-    accuracy_questions = totally_correct / len(counts)
-
-    # distribution of different answers
-    count_col = "cluster_id" if dataset_id == "SciBench" else "extracted_number"
-    diff_counts = unique_count_distribution(df, count_col)
-
-    values = np.fromiter(diff_counts.keys(), dtype=float)
-    freqs = np.fromiter(diff_counts.values(), dtype=float)
-
-    mean = np.average(values, weights=freqs)
-    std = np.sqrt(np.average((values - mean) ** 2, weights=freqs))
-
-    return {
-        "totally_correct_questions": totally_correct,
-        "accuracy_questions": float(accuracy_questions),
-        "accuracy": accuracy,
-        "different_answer_count": diff_counts,
-        "different_answer_count_mean": float(mean),
-        "different_answer_count_std": float(std),
-    }
-
-accuracy_per_ds_per_model_arithmetic = defaultdict(dict)
-
-for dataset in arithmetic_datasets:
-    dataset_id = dataset["id"]
-
-    for model in models:
-        print_with_time(f"Processing {dataset_id}/{model['id']}")
-
-        df = data[dataset_id][model["id"]]
-        model_id = model["id"]
-
-        accuracy_per_ds_per_model_arithmetic[dataset_id][model_id] = \
-            compute_arithmetic_metrics(df, dataset_id)
-```
-
-## MC Accuracy
-
-```python
-accuracy_per_ds_per_model_mc = {}
-
-def compute_binary_metrics(y_true: pd.Series, y_pred: pd.Series):
-    tp = (y_pred & y_true).sum()
-    fp = (y_pred & ~y_true).sum()
-    tn = (~y_pred & ~y_true).sum()
-    fn = (~y_pred & y_true).sum()
-
-    precision = tp / (tp + fp) if tp + fp else 0.0
-    recall = tp / (tp + fn) if tp + fn else 0.0
-    accuracy = (tp + tn) / (tp + tn + fp + fn) if tp + tn + fp + fn else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
-
-    return {
-        "tp": tp, "fp": fp, "tn": tn, "fn": fn,
-        "precision": precision,
-        "recall": recall,
-        "accuracy": accuracy,
-        "f1": f1,
-    }
-
-def compute_choice_question_accuracy(df):
-    # count correct answers per choice id
-    counts = df.groupby("id")["is_correct"].sum()
-
-    totally_correct_choices = (counts == 10).sum()
-    accuracy_choices = totally_correct_choices / len(counts)
-
-    # derive base question id
-    base_counts = counts.rename_axis("id").reset_index(name="correct_count")
-    base_counts["base_id"] = base_counts["id"].str[:-1]
-
-    # count how many fully-correct choices per question
-    question_counts = (
-        base_counts.groupby("base_id")["correct_count"]
-        .apply(lambda x: (x == 10).sum())
-    )
-
-    totally_correct_questions = (question_counts == 4).sum()
-    accuracy_questions = totally_correct_questions / len(question_counts)
-
-    return {
-        "totally_correct_choices": int(totally_correct_choices),
-        "accuracy_choices": float(accuracy_choices),
-        "totally_correct_questions": int(totally_correct_questions),
-        "accuracy_questions": float(accuracy_questions),
-    }
-
-accuracy_per_ds_per_model_mc = {}
-
-for dataset in mc_datasets:
-    dataset_id = dataset["id"]
-    accuracy_per_ds_per_model_mc[dataset_id] = {}
-
-    for model in models:
-        print_with_time(f"Processing {dataset_id}/{model['id']}")
-
-        df = data[dataset_id][model["id"]].copy()
-
-        mask = df["yes_no_probabilities"].notna()
-        if (~mask).any():
-            print(f"Warning: {(~mask).sum()} rows dropped due to missing yes_no_probabilities")
-        df = df[mask]
-
-        df["answer_idx"] = df["id"].apply(lambda x: x[-1])
-
-        y_true = (df["answer_idx"] == df["correct_answer_idx"]).astype(bool)
-        y_pred = df["yes_no_probabilities"].apply(lambda x: x and x[0] > x[1])
-
-        metrics = compute_binary_metrics(y_true, y_pred) #tp,fp,tn,fn,precision,recall,accuracy,f1
-        acc_stats = compute_choice_question_accuracy(df)
-
-        accuracy_per_ds_per_model_mc[dataset_id][model["id"]] = {
-            **metrics,
-            **acc_stats,
-        }
-
-with open(resources_dir / "accuracy_per_ds_per_model_mc.json", "w", encoding="utf-8") as f:
-    json.dump(accuracy_per_ds_per_model_mc, f, indent=4, ensure_ascii=False, cls=NumpyEncoder)
-```
-
-## Response Lengths
-
-```python
-length_metadata = {}
-
-for dataset in datasets:
-    dataset_id = dataset["id"]
-    if dataset_id not in length_metadata:
-        length_metadata[dataset_id] = {}
-    for model in models:
-        if model["id"] in length_metadata[dataset_id]:
-            continue
-        print_with_time(f"Processing {dataset_id}/{model['id']} ...")
-        lengths = data[dataset_id][model["id"]]["answer_token_len"]
-        mean = lengths.mean()
-        std = lengths.std()
-        length_metadata[dataset_id][model["id"]] = {"sum": lengths.sum(), "mean": mean, "std": std}
-```
-
-## Calibration Data
-
-Calibration metrics are computed for every model/dataset/uq_method combination using
-`calculate_calibration_data_discrete` and stored in `cal_data`.
-
-```python
-def compute_calibration_metrics(df, uq_method):
-    uq_method_id = uq_method["id"]
-    need_to_invert = uq_method["type"] == "uncertainty"
-
-    cleared = df.dropna(subset=[uq_method_id])
-    invalid_uq_method_scores = len(df) - len(cleared)
-
-    correct = cleared["is_correct"].to_numpy()
-    certainties = cleared[uq_method_id].to_numpy()
-
-    if need_to_invert:
-        certainties = 1.0 - certainties
-
-    n_bins = uq_method.get("n_bins", 15)
-    bin_confs, bucket_accs, bucket_counts = calculate_calibration_data_discrete(
-        correct, certainties, n_bins
-    )
-
-    return {
-        "bin_confidences": bin_confs,
-        "bucket_accuracies": bucket_accs,
-        "bucket_counts": bucket_counts,
-        "ece": calculate_ece(bin_confs, bucket_accs, bucket_counts),
-        "auroc": roc_auc_score(correct, certainties),
-        "accuracy": float(correct.mean()) if len(correct) else 0.0,
-        "average_certainty": float(certainties.mean()),
-        "normalized_entropy": calculate_normalized_entropy(bucket_counts),
-        "invalid_uq_method_scores": int(invalid_uq_method_scores),
-    }
-
-# cal_data[model_id][dataset_id][uq_method_id] = calibration metrics dict (or None on failure)
-cal_data = defaultdict(lambda: defaultdict(dict))
-
-for model in models:
-    model_id = model["id"]
-
-    for dataset in datasets:
-        dataset_id = dataset["id"]
-
-        df = data[dataset_id][model_id]
-        clean_df = filter_valid_answers(df).dropna(subset=["is_correct"])
-        invalid_answers = len(df) - len(clean_df)
-
-        for uq_method in uq_methods:
-            uq_method_id = uq_method["id"]
-
-            try:
-                result = compute_calibration_metrics(clean_df, uq_method) # bin_confidences, bucket_accuracies, bucket_counts, ece, auroc, accuracy, average_certainty, normalized_entropy, invalid_uq_method_scores
-                result.update({
-                    "total_items": len(df),
-                    "invalid_answers": int(invalid_answers),
-                })
-                cal_data[model_id][dataset_id][uq_method_id] = result
-
-            except Exception as e:
-                print_with_time(f"No data for {model_id}/{dataset_id}/{uq_method_id}: {e}")
-                cal_data[model_id][dataset_id][uq_method_id] = None
-```
-
-## Verbalized Uncertainty Distribution
-
-Value counts of verbalized confidence scores per model are computed.
-
-```python
-verbalized_stats = {}
-
-for model in models:
-    value_counts = None
-    for dataset in datasets:
-        df = data[dataset["id"]][model["id"]]
-        print_with_time(f"Processing {dataset['id']}/{model['id']} - len={len(df)}")
-        vc = df["verbalized"].value_counts()
-        value_counts = vc if value_counts is None else value_counts.add(vc, fill_value=0)
-    verbalized_stats[model["id"]] = value_counts
-```
-
-## P(True) Bucket Counts
-
-```python
-# ptrue_bucket_counts[model_id] = summed bucket_counts array across all datasets
-ptrue_bucket_counts = {}
-for model in models:
-    total = np.zeros(15, dtype=int)
-    for dataset in datasets:
-        counts = cal_data[model["id"]][dataset["id"]]["p_true"]["bucket_counts"]
-        total += np.array(counts, dtype=int)
-    ptrue_bucket_counts[model["id"]] = total
-```
-
-# Data Visualization
-
-## Calibration Plot Helpers
-
-```python
-# Calibration subplot renderer and stats-table renderer; grid builders by model and by uq_method
-from analysis_utils.calibration_plot_helpers import (
-    plot_calibration_subplot, plot_calibration_stats_table,
-    build_calibration_grid_by_model, build_calibration_grid_by_uq_method,
-)
-```
-
-## Arithmetic Answer Count Histogram
-
-```python
-nrows = len(arithmetic_datasets)
-ncols = len(models)
-
-fig, axes = plt.subplots(
-    nrows, ncols,
-    figsize=(ncols * 3.5, nrows * 3.05),
-    gridspec_kw={"width_ratios": [1] * ncols, "height_ratios": [1] * nrows},
-    squeeze=False,
-)
-
-for i, dataset in enumerate(arithmetic_datasets):
-    axes[i, 0].text(
-        -0.3, 0.5, dataset["label"], ha="center", va="center",
-        rotation="vertical", fontsize=16, fontweight="bold",
-        transform=axes[i, 0].transAxes,
-    )
-
-for i, dataset in enumerate(arithmetic_datasets):
-    for j, model in enumerate(models):
-        ax = axes[i, j]
-        df = data[dataset["id"]][model["id"]]
-        count_col = "cluster_id" if dataset["id"] == "SciBench" else "extracted_number"
-        count_dict = unique_count_distribution(df, count_col)
-
-        x_vals = list(range(1, 11))
-        y_vals = [count_dict.get(x, 0) for x in x_vals]
-        mean = np.average(list(count_dict.keys()), weights=list(count_dict.values()))
-
-        ax.bar(x_vals, y_vals, color=color[model["type"]], edgecolor="black")
-        ax.set_xlim(0.5, 10.5)
-        ax.set_xticks(x_vals)
-        if i == len(arithmetic_datasets) - 1:
-            ax.set_xlabel("Count of Different Arithmetic Results", fontsize=12)
-        if j == 0:
-            ax.set_ylabel("Count of Dataset Items", fontsize=12)
-        if i == 0:
-            ax.annotate(
-                model["shortname"], xy=(0.5, 1.05), xycoords="axes fraction",
-                ha="center", va="bottom", fontsize=16, fontweight="bold",
-            )
-
-plt.tight_layout()
-for ext in ["svg", "pdf", "png"]:
-    plt.savefig(figures_dir / f"arithmetic_answer_count.{ext}", bbox_inches="tight")
-plt.show()
-```
-
-## Accuracy Tables
-
-```python
-# LaTeX table builders: accuracy comparison, response-length stats, and generic scalar metric tables
-from analysis_utils.latex_utils import make_accuracy_table_latex, make_length_table_latex, make_scalar_table_latex
-```
-
-```python
-model_ids = [m["id"] for m in models]
-
-latex_table = make_accuracy_table_latex(
-    accuracy_per_ds_per_model_mc,
-    {
-        "accuracy": "Accuracy",
-        "precision": "Precision",
-        "recall": "Recall",
-        "f1": "F1-Score",
-        "accuracy_choices": "Accuracy across Choices",
-        "accuracy_questions": "Accuracy across Questions",
-    },
-    model_ids,
-    caption=(
-        r"\caption[Accuracy, Precision, Recall, F1, and Consistency Metrics Across Models and MC Datasets]"
-        r"{\textbf{Comparison of Accuracy, Precision, Recall, F1-Score, and Consistency Metrics Across Models "
-        r"and Multiple‐Choice Datasets.} Shown are base accuracy, precision, recall, F1-score, accuracy "
-        r"across choices (proportion of correctly classified options over ten generations), and accuracy "
-        r"across questions (proportion of questions with all four options correct over ten generations) "
-        r"for each model–dataset pair.}"
-    ),
-)
-with open(tables_dir / f"accuracy_mc_datasets.tex", "w", encoding="utf-8") as f:
-    f.write(latex_table)
-```
-
-```python
-latex_table = make_accuracy_table_latex(
-    accuracy_per_ds_per_model_arithmetic,
-    {
-        "accuracy": "Accuracy",
-        "accuracy_questions": "Accuracy across Questions",
-        "different_answer_count_mean": "Mean of Different Answers across Iterations",
-    },
-    model_ids,
-    caption=(
-        r"\caption[Accuracy, Consistency, and Answer Variability Across Arithmetic Datasets]"
-        r"{\textbf{Comparison of Accuracy, Question‐Level Consistency, and Answer Variability Across "
-        r"Arithmetic Datasets.} Metrics include base accuracy, the proportion of questions with all "
-        r"correct answers over ten runs, and the mean number of distinct answers produced across "
-        r"iterations for each model–dataset pair.}"
-    ),
-)
-with open(tables_dir / f"accuracy_arithmetic_datasets.tex", "w", encoding="utf-8") as f:
-    f.write(latex_table)
-```
-
-## Calibration Plots by Model
-
-`build_calibration_grid_by_model` reads from `cal_data` and builds a dataset x uq_method grid for
-one model.
-
-```python
-os.makedirs(figures_dir / f"by_model", exist_ok=True)
-
-for model in models:
-    for with_table in [True, False]:
-        print_with_time(f"Creating plot for {model['name']} (with_table={with_table}) ...")
-        plot = build_calibration_grid_by_model(cal_data, model, datasets, uq_methods, with_table=with_table)
-        suffix = "_with_table" if with_table else ""
-        for ext in ['svg', 'png']:
-            plot.savefig(figures_dir / f"by_model/{model['id']}_calibration_plots{suffix}.{ext}", bbox_inches="tight")
-        plot.close()
-```
-
-```python
-for model in models:
-    ds = [d for d in datasets if d["id"] in ["MMLU", "GSM8K"]]
-    plot = build_calibration_grid_by_model(cal_data, model, ds, uq_methods, with_table=False, with_title=False)
-    for ext in ['svg', 'png']:
-        plot.savefig(figures_dir / f"by_model/short_{model['id']}_calibration_plots_short.{ext}", bbox_inches="tight")
-    plot.close()
-```
-
-## Calibration Plots by Metric
-
-`build_calibration_grid_by_uq_method` reads from `cal_data` and builds a dataset x model
-grid for one uq_method.
-
-```python
-os.makedirs(figures_dir / f"by_uq_method", exist_ok=True)
-
-for uq_method in uq_methods:
-    for with_table in [True, False]:
-        print_with_time(f"Creating plot for {uq_method['label']} (with_table={with_table}) ...")
-        plot = build_calibration_grid_by_uq_method(cal_data, models, datasets, uq_method, with_table=with_table)
-        label_safe = uq_method["label"].replace(" ", "_")
-        suffix = "_with_table" if with_table else ""
-        for ext in ['svg', 'png']:
-            plot.savefig(figures_dir / f"by_uq_method/uq_method_{label_safe}_calibration_plots{suffix}.{ext}", bbox_inches="tight")
-        plot.close()
-```
-
-## Response Lengths Table
-
-```python
-def make_cal_metric_table_latex(cal_data, models, datasets, uq_method, prop, caption):
-    """Build a scalar LaTeX table for one calibration property extracted from cal_data.
-
-    Extracts ``cal_data[model_id][dataset_id][uq_method_id][prop]`` into a flat
-    values dict and delegates table formatting to ``make_scalar_table_latex``.
-
-    Args:
-        cal_data: Nested dict ``cal_data[model_id][dataset_id][uq_method_id]``.
-        models: List of model dicts with ``"id"`` key.
-        datasets: Dict of ``dataset_id`` → dataset info (keys used as row IDs).
-        uq_method: Metric dict with ``"id"`` key.
-        prop: Property key to extract (e.g. ``"ece"``, ``"auroc"``).
-        caption: Table caption string.
-
-    Returns:
-        str: Complete LaTeX table code.
-    """
-    model_ids = [m["id"] for m in models]
-    uq_method_id = uq_method["id"]
-    values = {
-        ds_id: {
-            mid: (cal_data[mid][ds_id].get(uq_method_id) or {}).get(prop, float("nan"))
-            for mid in model_ids
-        }
-        for ds_id in datasets
-    }
-    return make_scalar_table_latex(list(datasets), model_ids, values, caption)
-```
-
-```python
-latex_table = make_length_table_latex(
-    length_metadata,
-    model_ids=[m["id"] for m in models],
-    dataset_ids=list(datasets_combined),
-)
-with open(tables_dir / f"response_lengths.tex", "w", encoding="utf-8") as f:
-    f.write(latex_table)
-print(latex_table)
-```
-
-## ECE, Entropy, and AUROC Tables
-
-```python
-for uq_method in uq_methods:
-    latex_table = make_cal_metric_table_latex(
-        cal_data, models, datasets_combined, uq_method=uq_method,
-        prop="ece",
-        caption=f"ECE by Model and Dataset for {uq_method['label']}",
-    )
-    with open(tables_dir / f"ece_{uq_method['label'].replace(' ', '_')}.tex", "w", encoding="utf-8") as f:
-        f.write(latex_table)
-    print(latex_table)
-```
-
-```python
-for uq_method in uq_methods:
-    latex_table = make_cal_metric_table_latex(
-        cal_data, models, datasets_combined, uq_method=uq_method,
-        prop="normalized_entropy",
-        caption=f"Normalized Entropy of Bucket Counts by Model and Dataset for {uq_method['label']}",
-    )
-    with open(tables_dir / f"normalized_entropy_{uq_method['label'].replace(' ', '_')}.tex", "w", encoding="utf-8") as f:
-        f.write(latex_table)
-    print(latex_table)
-```
-
-```python
-for uq_method in uq_methods:
-    latex_table = make_cal_metric_table_latex(
-        cal_data, models, datasets_combined, uq_method=uq_method,
-        prop="auroc",
-        caption=f"AUROC by Model and Dataset for {uq_method['label']}",
-    )
-    with open(tables_dir / f"auroc_{uq_method['label'].replace(' ', '_')}.tex", "w", encoding="utf-8") as f:
-        f.write(latex_table)
-    print(latex_table)
-```
-
-## Verbalized Uncertainty Distribution
-
-```python
-# Donut-chart grid for verbalized confidence distributions; bar-chart grid for P(True) bucket counts
-from analysis_utils.distribution_plots import plot_donut_row_with_other, plot_bucket_distribution
-```
-
-```python
-color_overrides = {
-    0.0: "#C15858", 0.05: "#D57170", 0.2: "#F29999", 0.25: "#F29999",
-    0.5: "#E7BA52", 0.8: "#ccdc9e", 0.85: "#ccdc9e", 0.86: "#b1c284",
-    0.9: "#b1c284", 0.95: "#96a96a", 0.97: "#899D5D", 0.99: "#7c9151",
-    1.0: "#637939",
-}
-for key in list(color_overrides.keys()):
-    color_overrides[str(key)] = color_overrides[key]
-
-scale_fonts(1.3)
-fig = plot_donut_row_with_other(verbalized_stats, models, threshold_pct=5, color_dict=color_overrides)
-for ext in ["svg", "pdf", "png"]:
-    plt.savefig(figures_dir / f"verbalized_value_distribution_full.{ext}", bbox_inches="tight")
-plt.show()
-
-mpl.rcdefaults()
-apply_matplotlib_defaults()
-```
-
-## P(True) Bucket Count Distribution
-
-```python
-fig = plot_bucket_distribution(ptrue_bucket_counts, models)
-for ext in ["svg", "pdf", "png"]:
-    plt.savefig(figures_dir / f"ptrue_bucket_counts_full.{ext}", bbox_inches="tight")
-plt.show()
-```
-
-```python
-
-```
+---jupyter:  jupytext:    formats: ipynb,md    text_representation:      extension: .md      format_name: markdown      format_version: '1.3'      jupytext_version: 1.18.1  kernelspec:    display_name: Python 3 (ipykernel)    language: python    name: python3---# Imports```python%load_ext autoreload%autoreload 2import jsonimport osimport refrom collections import defaultdictimport numpy as npimport matplotlib as mplimport matplotlib.pyplot as pltimport numpy as npimport pandas as pdfrom async_graph_bench.stores import CSVDataStore, DiskCacheStorefrom functools import reducefrom sklearn.metrics import roc_auc_scorefrom sklearn.metrics import (    precision_recall_fscore_support,    accuracy_score,    confusion_matrix,)``````pythonfrom calibration_visualization import calculate_calibration_data_discretefrom calibration_visualization import calculate_ecefrom calibration_visualization import calculate_normalized_entropyfrom calibration_visualization import plot_calibration_curvefrom util.config import CALIBRATION_PLOT_COLORS, apply_matplotlib_defaultsfrom datasets_exp2 import (    arithmetic_datasets,    arithmetic_datasets_dict,    datasets,    datasets_combined,    mc_datasets,    mc_datasets_dict,)from util.generate_grid_plot import generate_grid_plotfrom models import MODELSfrom util.numpy_utils import NumpyEncoderfrom util.plot_empty import plot_empty```# Configuration```python# Timestamped print helper (used throughout to track long-running loops)from analysis_utils.misc_utils import print_with_time, extract_number# Colour blending utility (lighten/darken named colours; used for bar-chart fill colours)from analysis_utils.color_utils import adjust_color, scale_fonts``````pythonapply_matplotlib_defaults()data_base_path = Path(".\\data")resources_dir = Path(".\\resources")figures_dir = resources_dir / "figures"tables_dir = resources_dir / "tables"for d in [resources_dir, figures_dir, tables_dir]:    os.makedirs(d, exist_ok=True)color = {    "instruct": adjust_color("tab:blue", 0.7, lighten=True),    "reasoning": adjust_color("tab:green", 0.7, lighten=True),}```# Model and Dataset Selection```pythonmodels = [    m for m in MODELS    if m["type"] in ["instruct", "reasoning"] and "Magistral" not in m["name"]]print("Running analysis for", ", ".join([m["shortname"] for m in models]))```Metrics to evaluate. ``n_bins`` controls calibration-plot bucket granularity.Frequency of Answer uses 11 bins (its scores are discrete multiples of 0.1);all other uq methods use 15.```pythonuq_methods = [    {"label": "Verbalized Uncertainty", "id": "verbalized",         "type": "certainty", "n_bins": 15},    {"label": "P(True)",                "id": "p_true",             "type": "certainty", "n_bins": 15},    {"label": "Frequency of Answer",    "id": "frequency_of_answer","type": "certainty", "n_bins": 11},    {"label": "CCP",                    "id": "ccp",                "type": "certainty", "n_bins": 15},]```# Data Loading```pythondef get_merged_dataset(directory):    """Load and merge all per-item estimations for a given benchmark output directory.    Merges AnsweredCorrectly, ClaimConditionedProbability, PTrueOriginal, and    Verbalized2SUEExtractor output files on (id, iter).    Args:        directory: Path string to the model/dataset output directory.    Returns:        pd.DataFrame: Merged DataFrame with columns is_correct, ccp, p_true, verbalized.    """    answered_correctly_df = (DiskCacheStore if "SciBench" in directory else CSVDataStore)(        directory, "AnsweredCorrectly"    ).to_dataframe()        claim_prob_df, p_true_df, verbalized_df = [        CSVDataStore(directory, src).to_dataframe().rename(columns={"estimations": name})        for name, src in [            ("ccp", "ClaimConditionedProbability"),            ("p_true", "PTrueOriginal"),            ("verbalized", "Verbalized2SUEExtractor"),        ]    ]    dfs = [answered_correctly_df, claim_prob_df, p_true_df, verbalized_df]    print(f"\t\t{'/'.join(str(len(d)) for d in dfs)}")    lengths = [len(df) for df in dfs]    merged_df = reduce(        lambda left, right: pd.merge(left, right, on=["id", "iter"], how="inner"),        dfs,    )    assert len(merged_df) == min(lengths) and len(merged_df) != 0, "Merge failed!"    return merged_df``````python# Filters out rows with failed answer extraction; counts unique answers per question IDfrom analysis_utils.dataframe_utils import filter_valid_answers, unique_count_distribution``````python# data[dataset_id][model_id] = merged DataFramedata = {}for dataset in datasets:    dataset_id = dataset["id"]    data[dataset_id] = {}    print(f"Loading data for dataset {dataset_id} per model...")    for model in models:        print(f"\tLoading model {model['basename']}...")        data[dataset_id][model["id"]] = get_merged_dataset(            f"{data_base_path}/{dataset_id}/{model['basename']}"        )``````pythondata["MMLU"][models[0]["id"]]["token_probs"]```# Data Transformation## Arithmetic Answer Distribution```pythondef compute_arithmetic_metrics(df, dataset_id):    # overall accuracy    accuracy = float(df["is_correct"].mean())    # per-question correctness    counts = df.groupby("id")["is_correct"].sum()    totally_correct = int((counts == 10).sum())    accuracy_questions = totally_correct / len(counts)    # distribution of different answers    count_col = "cluster_id" if dataset_id == "SciBench" else "extracted_number"    diff_counts = unique_count_distribution(df, count_col)    values = np.fromiter(diff_counts.keys(), dtype=float)    freqs = np.fromiter(diff_counts.values(), dtype=float)    mean = np.average(values, weights=freqs)    std = np.sqrt(np.average((values - mean) ** 2, weights=freqs))    return {        "totally_correct_questions": totally_correct,        "accuracy_questions": float(accuracy_questions),        "accuracy": accuracy,        "different_answer_count": diff_counts,        "different_answer_count_mean": float(mean),        "different_answer_count_std": float(std),    }accuracy_per_ds_per_model_arithmetic = defaultdict(dict)for dataset in arithmetic_datasets:    dataset_id = dataset["id"]    for model in models:        print_with_time(f"Processing {dataset_id}/{model['id']}")        df = data[dataset_id][model["id"]]        model_id = model["id"]        accuracy_per_ds_per_model_arithmetic[dataset_id][model_id] = \            compute_arithmetic_metrics(df, dataset_id)```## MC Accuracy```pythonaccuracy_per_ds_per_model_mc = {}def compute_binary_metrics(y_true: pd.Series, y_pred: pd.Series):    tp = (y_pred & y_true).sum()    fp = (y_pred & ~y_true).sum()    tn = (~y_pred & ~y_true).sum()    fn = (~y_pred & y_true).sum()    precision = tp / (tp + fp) if tp + fp else 0.0    recall = tp / (tp + fn) if tp + fn else 0.0    accuracy = (tp + tn) / (tp + tn + fp + fn) if tp + tn + fp + fn else 0.0    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0    return {        "tp": tp, "fp": fp, "tn": tn, "fn": fn,        "precision": precision,        "recall": recall,        "accuracy": accuracy,        "f1": f1,    }def compute_choice_question_accuracy(df):    # count correct answers per choice id    counts = df.groupby("id")["is_correct"].sum()    totally_correct_choices = (counts == 10).sum()    accuracy_choices = totally_correct_choices / len(counts)    # derive base question id    base_counts = counts.rename_axis("id").reset_index(name="correct_count")    base_counts["base_id"] = base_counts["id"].str[:-1]    # count how many fully-correct choices per question    question_counts = (        base_counts.groupby("base_id")["correct_count"]        .apply(lambda x: (x == 10).sum())    )    totally_correct_questions = (question_counts == 4).sum()    accuracy_questions = totally_correct_questions / len(question_counts)    return {        "totally_correct_choices": int(totally_correct_choices),        "accuracy_choices": float(accuracy_choices),        "totally_correct_questions": int(totally_correct_questions),        "accuracy_questions": float(accuracy_questions),    }accuracy_per_ds_per_model_mc = {}for dataset in mc_datasets:    dataset_id = dataset["id"]    accuracy_per_ds_per_model_mc[dataset_id] = {}    for model in models:        print_with_time(f"Processing {dataset_id}/{model['id']}")        df = data[dataset_id][model["id"]].copy()        mask = df["yes_no_probabilities"].notna()        if (~mask).any():            print(f"Warning: {(~mask).sum()} rows dropped due to missing yes_no_probabilities")        df = df[mask]        df["answer_idx"] = df["id"].apply(lambda x: x[-1])        y_true = (df["answer_idx"] == df["correct_answer_idx"]).astype(bool)        y_pred = df["yes_no_probabilities"].apply(lambda x: x and x[0] > x[1])        metrics = compute_binary_metrics(y_true, y_pred) #tp,fp,tn,fn,precision,recall,accuracy,f1        acc_stats = compute_choice_question_accuracy(df)        accuracy_per_ds_per_model_mc[dataset_id][model["id"]] = {            **metrics,            **acc_stats,        }with open(resources_dir / "accuracy_per_ds_per_model_mc.json", "w", encoding="utf-8") as f:    json.dump(accuracy_per_ds_per_model_mc, f, indent=4, ensure_ascii=False, cls=NumpyEncoder)```## Response Lengths```pythonlength_metadata = {}for dataset in datasets:    dataset_id = dataset["id"]    if dataset_id not in length_metadata:        length_metadata[dataset_id] = {}    for model in models:        if model["id"] in length_metadata[dataset_id]:            continue        print_with_time(f"Processing {dataset_id}/{model['id']} ...")        lengths = data[dataset_id][model["id"]]["answer_token_len"]        mean = lengths.mean()        std = lengths.std()        length_metadata[dataset_id][model["id"]] = {"sum": lengths.sum(), "mean": mean, "std": std}```## Calibration DataCalibration metrics are computed for every model/dataset/uq_method combination using`calculate_calibration_data_discrete` and stored in `cal_data`.```pythondef compute_calibration_metrics(df, uq_method):    uq_method_id = uq_method["id"]    need_to_invert = uq_method["type"] == "uncertainty"    cleared = df.dropna(subset=[uq_method_id])    invalid_uq_method_scores = len(df) - len(cleared)    correct = cleared["is_correct"].to_numpy()    certainties = cleared[uq_method_id].to_numpy()    if need_to_invert:        certainties = 1.0 - certainties    n_bins = uq_method.get("n_bins", 15)    bin_confs, bucket_accs, bucket_counts = calculate_calibration_data_discrete(        correct, certainties, n_bins    )    return {        "bin_confidences": bin_confs,        "bucket_accuracies": bucket_accs,        "bucket_counts": bucket_counts,        "correct": correct,        "certainties": certainties,        "ece": calculate_ece(bin_confs, bucket_accs, bucket_counts),        "auroc": roc_auc_score(correct, certainties),        "accuracy": float(correct.mean()) if len(correct) else 0.0,        "average_certainty": float(certainties.mean()),        "normalized_entropy": calculate_normalized_entropy(bucket_counts),        "invalid_uq_method_scores": int(invalid_uq_method_scores),    }# cal_data[model_id][dataset_id][uq_method_id] = calibration metrics dict (or None on failure)cal_data = defaultdict(lambda: defaultdict(dict))for model in models:    model_id = model["id"]    for dataset in datasets:        dataset_id = dataset["id"]        df = data[dataset_id][model_id]        clean_df = filter_valid_answers(df).dropna(subset=["is_correct"])        invalid_answers = len(df) - len(clean_df)        for uq_method in uq_methods:            uq_method_id = uq_method["id"]            try:                result = compute_calibration_metrics(clean_df, uq_method) # bin_confidences, bucket_accuracies, bucket_counts, ece, auroc, accuracy, average_certainty, normalized_entropy, invalid_uq_method_scores, correct, certainties                result.update({                    "total_items": len(df),                    "invalid_answers": int(invalid_answers),                })                cal_data[model_id][dataset_id][uq_method_id] = result            except Exception as e:                print_with_time(f"No data for {model_id}/{dataset_id}/{uq_method_id}: {e}")                cal_data[model_id][dataset_id][uq_method_id] = None```## Verbalized Uncertainty DistributionValue counts of verbalized confidence scores per model are computed.```pythonverbalized_stats = {}for model in models:    value_counts = None    for dataset in datasets:        df = data[dataset["id"]][model["id"]]        print_with_time(f"Processing {dataset['id']}/{model['id']} - len={len(df)}")        vc = df["verbalized"].value_counts()        value_counts = vc if value_counts is None else value_counts.add(vc, fill_value=0)    verbalized_stats[model["id"]] = value_counts```## P(True) Bucket Counts```python# ptrue_bucket_counts[model_id] = summed bucket_counts array across all datasetsptrue_bucket_counts = {}for model in models:    total = np.zeros(15, dtype=int)    for dataset in datasets:        counts = cal_data[model["id"]][dataset["id"]]["p_true"]["bucket_counts"]        total += np.array(counts, dtype=int)    ptrue_bucket_counts[model["id"]] = total```# Data Visualization## Calibration Plot Helpers```python# Calibration subplot renderer and stats-table renderer; grid builders by model and by uq_method;# relplot wrapper for kernel-smoothed reliability diagramsfrom analysis_utils.calibration_plot_helpers import (    plot_calibration_subplot, plot_calibration_stats_table,    build_calibration_grid_by_model, build_calibration_grid_by_uq_method,    plot_relplot_subplot,)```## Arithmetic Answer Count Histogram```pythonnrows = len(arithmetic_datasets)ncols = len(models)fig, axes = plt.subplots(    nrows, ncols,    figsize=(ncols * 3.5, nrows * 3.05),    gridspec_kw={"width_ratios": [1] * ncols, "height_ratios": [1] * nrows},    squeeze=False,)for i, dataset in enumerate(arithmetic_datasets):    axes[i, 0].text(        -0.3, 0.5, dataset["label"], ha="center", va="center",        rotation="vertical", fontsize=16, fontweight="bold",        transform=axes[i, 0].transAxes,    )for i, dataset in enumerate(arithmetic_datasets):    for j, model in enumerate(models):        ax = axes[i, j]        df = data[dataset["id"]][model["id"]]        count_col = "cluster_id" if dataset["id"] == "SciBench" else "extracted_number"        count_dict = unique_count_distribution(df, count_col)        x_vals = list(range(1, 11))        y_vals = [count_dict.get(x, 0) for x in x_vals]        mean = np.average(list(count_dict.keys()), weights=list(count_dict.values()))        ax.bar(x_vals, y_vals, color=color[model["type"]], edgecolor="black")        ax.set_xlim(0.5, 10.5)        ax.set_xticks(x_vals)        if i == len(arithmetic_datasets) - 1:            ax.set_xlabel("Count of Different Arithmetic Results", fontsize=12)        if j == 0:            ax.set_ylabel("Count of Dataset Items", fontsize=12)        if i == 0:            ax.annotate(                model["shortname"], xy=(0.5, 1.05), xycoords="axes fraction",                ha="center", va="bottom", fontsize=16, fontweight="bold",            )plt.tight_layout()for ext in ["svg", "pdf", "png"]:    plt.savefig(figures_dir / f"arithmetic_answer_count.{ext}", bbox_inches="tight")plt.show()```## Accuracy Tables```python# LaTeX table builders: accuracy comparison, response-length stats, and generic scalar metric tablesfrom analysis_utils.latex_utils import make_accuracy_table_latex, make_length_table_latex, make_scalar_table_latex``````pythonmodel_ids = [m["id"] for m in models]latex_table = make_accuracy_table_latex(    accuracy_per_ds_per_model_mc,    {        "accuracy": "Accuracy",        "precision": "Precision",        "recall": "Recall",        "f1": "F1-Score",        "accuracy_choices": "Accuracy across Choices",        "accuracy_questions": "Accuracy across Questions",    },    model_ids,    caption=(        r"\caption[Accuracy, Precision, Recall, F1, and Consistency Metrics Across Models and MC Datasets]"        r"{\textbf{Comparison of Accuracy, Precision, Recall, F1-Score, and Consistency Metrics Across Models "        r"and Multiple‐Choice Datasets.} Shown are base accuracy, precision, recall, F1-score, accuracy "        r"across choices (proportion of correctly classified options over ten generations), and accuracy "        r"across questions (proportion of questions with all four options correct over ten generations) "        r"for each model–dataset pair.}"    ),)with open(tables_dir / f"accuracy_mc_datasets.tex", "w", encoding="utf-8") as f:    f.write(latex_table)``````pythonlatex_table = make_accuracy_table_latex(    accuracy_per_ds_per_model_arithmetic,    {        "accuracy": "Accuracy",        "accuracy_questions": "Accuracy across Questions",        "different_answer_count_mean": "Mean of Different Answers across Iterations",    },    model_ids,    caption=(        r"\caption[Accuracy, Consistency, and Answer Variability Across Arithmetic Datasets]"        r"{\textbf{Comparison of Accuracy, Question‐Level Consistency, and Answer Variability Across "        r"Arithmetic Datasets.} Metrics include base accuracy, the proportion of questions with all "        r"correct answers over ten runs, and the mean number of distinct answers produced across "        r"iterations for each model–dataset pair.}"    ),)with open(tables_dir / f"accuracy_arithmetic_datasets.tex", "w", encoding="utf-8") as f:    f.write(latex_table)```## Calibration Plots by Model`build_calibration_grid_by_model` reads from `cal_data` and builds a dataset x uq_method grid forone model.```pythonos.makedirs(figures_dir / f"by_model", exist_ok=True)for model in models:    for with_table in [True, False]:        print_with_time(f"Creating plot for {model['name']} (with_table={with_table}) ...")        plot = build_calibration_grid_by_model(cal_data, model, datasets, uq_methods, with_table=with_table)        suffix = "_with_table" if with_table else ""        for ext in ['svg', 'png']:            plot.savefig(figures_dir / f"by_model/{model['id']}_calibration_plots{suffix}.{ext}", bbox_inches="tight")        plot.close()``````pythonfor model in models:    ds = [d for d in datasets if d["id"] in ["MMLU", "GSM8K"]]    plot = build_calibration_grid_by_model(cal_data, model, ds, uq_methods, with_table=False, with_title=False)    for ext in ['svg', 'png']:        plot.savefig(figures_dir / f"by_model/short_{model['id']}_calibration_plots_short.{ext}", bbox_inches="tight")    plot.close()```## Calibration Plots by Model (relplot)Same grid as above but each subplot uses `relplot` kernel-smoothed reliability diagramsinstead of the binned calibration curve.```pythonfor model in models:    for with_table in [True, False]:        print_with_time(f"Creating relplot for {model['name']} (with_table={with_table}) ...")        plot = build_calibration_grid_by_model(            cal_data, model, datasets, uq_methods, with_table=with_table,            subplot_fn=plot_relplot_subplot, subplot_aspect=None,        )        suffix = "_with_table" if with_table else ""        for ext in ['svg', 'png']:            plot.savefig(figures_dir / f"by_model/{model['id']}_calibration_plots{suffix}_relplot.{ext}", bbox_inches="tight")        plot.close()``````pythonfor model in models:    ds = [d for d in datasets if d["id"] in ["MMLU", "GSM8K"]]    plot = build_calibration_grid_by_model(        cal_data, model, ds, uq_methods, with_table=False, with_title=False,        subplot_fn=plot_relplot_subplot, subplot_aspect=None,    )    for ext in ['svg', 'png']:        plot.savefig(figures_dir / f"by_model/short_{model['id']}_calibration_plots_short_relplot.{ext}", bbox_inches="tight")    plot.close()```## Calibration Plots by Metric`build_calibration_grid_by_uq_method` reads from `cal_data` and builds a dataset x modelgrid for one uq_method.```pythonos.makedirs(figures_dir / f"by_uq_method", exist_ok=True)for uq_method in uq_methods:    for with_table in [True, False]:        print_with_time(f"Creating plot for {uq_method['label']} (with_table={with_table}) ...")        plot = build_calibration_grid_by_uq_method(cal_data, models, datasets, uq_method, with_table=with_table)        label_safe = uq_method["label"].replace(" ", "_")        suffix = "_with_table" if with_table else ""        for ext in ['svg', 'png']:            plot.savefig(figures_dir / f"by_uq_method/uq_method_{label_safe}_calibration_plots{suffix}.{ext}", bbox_inches="tight")        plot.close()```## Calibration Plots by UQ Method (relplot)Same grid as above but using `relplot` kernel-smoothed reliability diagrams.```pythonfor uq_method in uq_methods:    for with_table in [True, False]:        print_with_time(f"Creating relplot for {uq_method['label']} (with_table={with_table}) ...")        plot = build_calibration_grid_by_uq_method(            cal_data, models, datasets, uq_method, with_table=with_table,            subplot_fn=plot_relplot_subplot, subplot_aspect=None,        )        label_safe = uq_method["label"].replace(" ", "_")        suffix = "_with_table" if with_table else ""        for ext in ['svg', 'png']:            plot.savefig(figures_dir / f"by_uq_method/uq_method_{label_safe}_calibration_plots{suffix}_relplot.{ext}", bbox_inches="tight")        plot.close()```## Response Lengths Table```pythondef make_cal_metric_table_latex(cal_data, models, datasets, uq_method, prop, caption):    """Build a scalar LaTeX table for one calibration property extracted from cal_data.    Extracts ``cal_data[model_id][dataset_id][uq_method_id][prop]`` into a flat    values dict and delegates table formatting to ``make_scalar_table_latex``.    Args:        cal_data: Nested dict ``cal_data[model_id][dataset_id][uq_method_id]``.        models: List of model dicts with ``"id"`` key.        datasets: Dict of ``dataset_id`` → dataset info (keys used as row IDs).        uq_method: Metric dict with ``"id"`` key.        prop: Property key to extract (e.g. ``"ece"``, ``"auroc"``).        caption: Table caption string.    Returns:        str: Complete LaTeX table code.    """    model_ids = [m["id"] for m in models]    uq_method_id = uq_method["id"]    values = {        ds_id: {            mid: (cal_data[mid][ds_id].get(uq_method_id) or {}).get(prop, float("nan"))            for mid in model_ids        }        for ds_id in datasets    }    return make_scalar_table_latex(list(datasets), model_ids, values, caption)``````pythonlatex_table = make_length_table_latex(    length_metadata,    model_ids=[m["id"] for m in models],    dataset_ids=list(datasets_combined),)with open(tables_dir / f"response_lengths.tex", "w", encoding="utf-8") as f:    f.write(latex_table)print(latex_table)```## ECE, Entropy, and AUROC Tables```pythonfor uq_method in uq_methods:    latex_table = make_cal_metric_table_latex(        cal_data, models, datasets_combined, uq_method=uq_method,        prop="ece",        caption=f"ECE by Model and Dataset for {uq_method['label']}",    )    with open(tables_dir / f"ece_{uq_method['label'].replace(' ', '_')}.tex", "w", encoding="utf-8") as f:        f.write(latex_table)    print(latex_table)``````pythonfor uq_method in uq_methods:    latex_table = make_cal_metric_table_latex(        cal_data, models, datasets_combined, uq_method=uq_method,        prop="normalized_entropy",        caption=f"Normalized Entropy of Bucket Counts by Model and Dataset for {uq_method['label']}",    )    with open(tables_dir / f"normalized_entropy_{uq_method['label'].replace(' ', '_')}.tex", "w", encoding="utf-8") as f:        f.write(latex_table)    print(latex_table)``````pythonfor uq_method in uq_methods:    latex_table = make_cal_metric_table_latex(        cal_data, models, datasets_combined, uq_method=uq_method,        prop="auroc",        caption=f"AUROC by Model and Dataset for {uq_method['label']}",    )    with open(tables_dir / f"auroc_{uq_method['label'].replace(' ', '_')}.tex", "w", encoding="utf-8") as f:        f.write(latex_table)    print(latex_table)```## Verbalized Uncertainty Distribution```python# Donut-chart grid for verbalized confidence distributions; bar-chart grid for P(True) bucket countsfrom analysis_utils.distribution_plots import plot_donut_row_with_other, plot_bucket_distribution``````pythoncolor_overrides = {    0.0: "#C15858", 0.05: "#D57170", 0.2: "#F29999", 0.25: "#F29999",    0.5: "#E7BA52", 0.8: "#ccdc9e", 0.85: "#ccdc9e", 0.86: "#b1c284",    0.9: "#b1c284", 0.95: "#96a96a", 0.97: "#899D5D", 0.99: "#7c9151",    1.0: "#637939",}for key in list(color_overrides.keys()):    color_overrides[str(key)] = color_overrides[key]scale_fonts(1.3)fig = plot_donut_row_with_other(verbalized_stats, models, threshold_pct=5, color_dict=color_overrides)for ext in ["svg", "pdf", "png"]:    plt.savefig(figures_dir / f"verbalized_value_distribution_full.{ext}", bbox_inches="tight")plt.show()mpl.rcdefaults()apply_matplotlib_defaults()```## P(True) Bucket Count Distribution```pythonfig = plot_bucket_distribution(ptrue_bucket_counts, models)for ext in ["svg", "pdf", "png"]:    plt.savefig(figures_dir / f"ptrue_bucket_counts_full.{ext}", bbox_inches="tight")plt.show()``````python```

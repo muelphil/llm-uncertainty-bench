@@ -26,7 +26,7 @@ Each entry dict contains:
     is_arithmetic    -- ``True`` for arithmetic datasets, ``False`` for MC
 """
 
-from data_sources import (
+from seq_ue_calibration.data_sources import (
     MMLUDataSetProvider,
     ArcReasoningDataSetProvider,
     SciQDataSetProvider,

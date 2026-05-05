@@ -2,14 +2,11 @@
 
 Wraps the lower-level ``generate_grid_plot`` and ``plot_calibration_curve``
 utilities with project-standard renderers and layouts.
-
-Note: ``config`` and ``plot_calibration_curve`` are resolved via the sys.path
-entries added at the top of ``analysis.md`` before this module is imported.
 """
 
-from config import CALIBRATION_PLOT_COLORS
-from generate_grid_plot import generate_grid_plot
-from plot_calibration_curve import plot_calibration_curve
+from util.config import CALIBRATION_PLOT_COLORS
+from util.generate_grid_plot import generate_grid_plot
+from calibration_visualization import plot_calibration_curve
 
 
 def plot_calibration_subplot(ax, data_item, model_type):
@@ -68,10 +65,45 @@ def plot_calibration_stats_table(ax, data_item):
             cell.set_width(0.35)
     ax.axis("off")
 
+def plot_relplot_subplot(ax, data_item, model_type):
+    """Render a relplot reliability diagram on *ax*.
+
+    Uses ``relplot.rel_diagram`` (kernel-smoothed reliability diagram with
+    smECE) instead of the project's custom binned calibration curve.
+    Requires ``"correct"`` and ``"certainties"`` arrays in *data_item* —
+    these are stored in ``cal_data`` by ``compute_calibration_metrics``.
+
+    The confidence band (bootstrapped 95 % CI around the regression line) is
+    disabled by default for speed.  To enable it, change
+    ``plot_confidence_band=False`` to ``plot_confidence_band=True``; each
+    subplot will then run ~200 bootstrap iterations.
+
+    Args:
+        ax: Matplotlib ``Axes`` to draw on.
+        data_item: Calibration metrics dict; must contain ``"correct"``
+            (1-D int/bool array) and ``"certainties"`` (1-D float array in
+            [0, 1]).
+        model_type: Unused; present to satisfy the
+            ``plot_subplot_fn(ax, data, model_type)`` interface required by
+            ``generate_grid_plot``.
+    """
+    import relplot as rp
+    # Use prepare + plot separately so we can pass the existing ax's figure.
+    # Calling rp.rel_diagram(ax=ax) without fig would trigger a new figure
+    # creation (relplot's guard: `if ax is None or fig is None: ...`).
+    diagram = rp.prepare_rel_diagram(
+        f=data_item["certainties"],
+        y=data_item["correct"].astype(float),
+        plot_confidence_band=False,  # set to True to enable bootstrap CI bands (slow, ~200 iters)
+        report_CE_std=False,         # set to True to show ±CI on smECE label (requires bootstrapping)
+    )
+    rp.plot_rel_diagram(diagram, fig=ax.get_figure(), ax=ax)
+
 
 def build_calibration_grid_by_model(cal_data, model, datasets, metrics,
                                     with_table, skip_annotation=False,
-                                    with_title=True, **kwargs):
+                                    with_title=True, subplot_fn=None,
+                                    subplot_aspect=1, **kwargs):
     """Build a calibration grid (dataset rows × metric columns) for one model.
 
     Reads pre-computed calibration data from *cal_data* and delegates to
@@ -87,6 +119,11 @@ def build_calibration_grid_by_model(cal_data, model, datasets, metrics,
         with_table: If ``True``, include per-subplot statistics tables.
         skip_annotation: Forwarded to ``generate_grid_plot``.
         with_title: If ``True``, set a figure-level title with the model name.
+        subplot_fn: Callable ``(ax, data_item, model_type) -> None`` used to
+            draw each subplot.  Defaults to ``plot_calibration_subplot``.  Pass
+            ``plot_relplot_subplot`` for kernel-smoothed reliability diagrams.
+        subplot_aspect: Forwarded to ``generate_grid_plot``.  Pass ``None``
+            when *subplot_fn* manages its own layout (e.g. relplot).
         **kwargs: Additional keyword arguments forwarded to ``generate_grid_plot``.
 
     Returns:
@@ -99,20 +136,23 @@ def build_calibration_grid_by_model(cal_data, model, datasets, metrics,
     row_titles = [ds["id"].replace("_", "-") for ds in datasets]
     col_titles = [m["label"] for m in metrics]
     plot_title = f"Calibration Plots for Model {model['shortname']}" if with_title else None
+    _subplot_fn = subplot_fn if subplot_fn is not None else plot_calibration_subplot
     return generate_grid_plot(
         cell_data, row_titles, col_titles,
-        plot_subplot_fn=plot_calibration_subplot,
+        plot_subplot_fn=_subplot_fn,
         plot_table_fn=plot_calibration_stats_table if with_table else None,
         with_table=with_table,
         skip_annotation=skip_annotation,
         plot_title=plot_title,
+        subplot_aspect=subplot_aspect,
         **kwargs,
     )
 
 
 def build_calibration_grid_by_uq_method(cal_data, models, datasets, uq_method,
                                      with_table, skip_annotation=False,
-                                     with_title=True, **kwargs):
+                                     with_title=True, subplot_fn=None,
+                                     subplot_aspect=1, **kwargs):
     """Build a calibration grid (dataset rows × model columns) for one uq_method.
 
     Reads pre-computed calibration data from *cal_data* and delegates to
@@ -128,6 +168,11 @@ def build_calibration_grid_by_uq_method(cal_data, models, datasets, uq_method,
         with_table: If ``True``, include per-subplot statistics tables.
         skip_annotation: Forwarded to ``generate_grid_plot``.
         with_title: If ``True``, set a figure-level title with the uq_method name.
+        subplot_fn: Callable ``(ax, data_item, model_type) -> None`` used to
+            draw each subplot.  Defaults to ``plot_calibration_subplot``.  Pass
+            ``plot_relplot_subplot`` for kernel-smoothed reliability diagrams.
+        subplot_aspect: Forwarded to ``generate_grid_plot``.  Pass ``None``
+            when *subplot_fn* manages its own layout (e.g. relplot).
         **kwargs: Additional keyword arguments forwarded to ``generate_grid_plot``.
 
     Returns:
@@ -140,12 +185,14 @@ def build_calibration_grid_by_uq_method(cal_data, models, datasets, uq_method,
     row_titles = [ds["id"].replace("_", "-") for ds in datasets]
     col_titles = [m["shortname"] for m in models]
     plot_title = f"Calibration Plots for Uncertainty Metric {uq_method['label']}" if with_title else None
+    _subplot_fn = subplot_fn if subplot_fn is not None else plot_calibration_subplot
     return generate_grid_plot(
         cell_data, row_titles, col_titles,
-        plot_subplot_fn=plot_calibration_subplot,
+        plot_subplot_fn=_subplot_fn,
         plot_table_fn=plot_calibration_stats_table if with_table else None,
         with_table=with_table,
         skip_annotation=skip_annotation,
         plot_title=plot_title,
+        subplot_aspect=subplot_aspect,
         **kwargs,
     )

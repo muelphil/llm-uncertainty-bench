@@ -25,7 +25,7 @@ Example usage::
     all_datasets = datasets[:1] + [mmlu_physics] + datasets[1:]
 """
 
-from data_sources import (
+from label_prob_calibration.data_sources import (
     ArcReasoningDataSetProvider,
     arc_reasoning_shots,
     MMLUDataSetProvider,

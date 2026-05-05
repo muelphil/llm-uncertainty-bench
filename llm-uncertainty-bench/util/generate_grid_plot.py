@@ -14,7 +14,7 @@ experiment-agnostic.
 import numpy as np
 import matplotlib.pyplot as plt
 
-from plot_empty import plot_empty
+from util.plot_empty import plot_empty
 
 
 def generate_grid_plot(
@@ -31,6 +31,7 @@ def generate_grid_plot(
     row_col_titles_font_size=36,
     title_font_size=44,
     plot_title=None,
+    subplot_aspect=1,
 ):
     """
     Build a grid of calibration subplots and return the ``plt`` module.
@@ -61,6 +62,11 @@ def generate_grid_plot(
         skip_annotation (bool): Omit row/column title annotations entirely.
         row_col_titles_font_size (int): Font size for row and column headers.
         title_font_size (int): Font size for the overall figure title.
+        subplot_aspect (int | float | None): Aspect ratio applied to each
+            calibration subplot after drawing.  Pass ``None`` to skip setting
+            the aspect ratio (required for relplot subplots, which manage their
+            own layout).  Default is ``1`` (square, matching the legacy
+            calibration-curve style).
         plot_title (str | None): Overall figure title; omitted when ``None``.
 
     Returns:
@@ -100,7 +106,8 @@ def generate_grid_plot(
             else:
                 try:
                     plot_subplot_fn(subplot_ax, data, model_type)
-                    subplot_ax.set_aspect(1)
+                    if subplot_aspect is not None:
+                        subplot_ax.set_aspect(subplot_aspect)
                 except Exception:
                     print(f"subplot unplottable at row={i}, col={j}")
                     plot_empty(subplot_ax)
