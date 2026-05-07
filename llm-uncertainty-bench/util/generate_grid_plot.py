@@ -146,5 +146,5 @@ def generate_grid_plot(
         fig.text(0.5, 1.01, plot_title, ha="center", va="bottom",
                  fontsize=title_font_size, fontweight="bold")
 
-    plt.tight_layout()
-    return plt
+    fig.tight_layout()
+    return fig
