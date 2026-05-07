@@ -10,6 +10,8 @@ data path; ``shortname`` is a concise label for plot axes.
 """
 
 import random
+import os
+import re
 
 DEFAULTS = {
     # assumes 4x A100 available
@@ -253,30 +255,33 @@ MODELS = [
         "yes_no_ids": [8438, 2301],
     },
     # --models Ministral-8B-Instruct-2410,Phi-3-mini-4k-instruct,Llama-3.1-8B-Instruct,Qwen2.5-14B-Instruct
-    {
-        "name": "microsoft/Phi-3-mini-4k-instruct",  # 4B model
-        "type": "instruct",
-        "kwargs_a100": {"tensor_parallel_size": 1},
-        "kwargs_h100": {"tensor_parallel_size": 1},
-        "yes_no_ids": [3869, 1939],
-    },
-    {
-        "name": "meta-llama/Llama-3.1-8B-Instruct",
-        "type": "instruct",
-        "kwargs_a100": {"tensor_parallel_size": 1},
-        "kwargs_h100": {"tensor_parallel_size": 1},
-        "yes_no_ids": [7566, 2360],
-    },
-    {
-        "name": "Qwen/Qwen2.5-14B-Instruct",
-        "type": "instruct",
-        "kwargs_a100": {"tensor_parallel_size": 2},
-        "kwargs_h100": {"tensor_parallel_size": 1},
-        "yes_no_ids": [7414, 2308],
-    },
+    # {
+    #     "name": "microsoft/Phi-3-mini-4k-instruct",  # 4B model
+    #     "type": "instruct",
+    #     "kwargs_a100": {"tensor_parallel_size": 1},
+    #     "kwargs_h100": {"tensor_parallel_size": 1},
+    #     "yes_no_ids": [3869, 1939],
+    # },
+    # {
+    #     "name": "meta-llama/Llama-3.1-8B-Instruct",
+    #     "type": "instruct",
+    #     "kwargs_a100": {"tensor_parallel_size": 1},
+    #     "kwargs_h100": {"tensor_parallel_size": 1},
+    #     "yes_no_ids": [7566, 2360],
+    # },
+    # {
+    #     "name": "Qwen/Qwen2.5-14B-Instruct",
+    #     "type": "instruct",
+    #     "kwargs_a100": {"tensor_parallel_size": 2},
+    #     "kwargs_h100": {"tensor_parallel_size": 1},
+    #     "yes_no_ids": [7414, 2308],
+    # },
 ]
 
 for model in MODELS:
     provider, basename = model["name"].split("/", 1)
     if "basename" not in model:
-        model["basename"] = basename
+        model["basename"] = os.path.basename(model["name"])
+    if "shortname" not in model:
+        model["shortname"] = re.sub(r"(\-\d+|\-v\d.\d)$", "", model["basename"])
+    model.setdefault("id", model['basename'])

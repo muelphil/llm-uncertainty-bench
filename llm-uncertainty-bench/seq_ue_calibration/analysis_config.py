@@ -6,7 +6,7 @@ models, UQ methods, and file paths are defined in exactly one place.
 """
 
 from pathlib import Path
-from models import MODELS
+from util.models import MODELS
 
 # ---------------------------------------------------------------------------
 # Models & UQ methods
