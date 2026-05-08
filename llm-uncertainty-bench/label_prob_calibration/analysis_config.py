@@ -10,23 +10,15 @@ import os
 import re
 from pathlib import Path
 
-from models import MODELS
+from util.models import MODELS
 from datasets_exp1 import datasets, build_mmlu_physics_dataset
 
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
 
-# Attach convenience fields to every model dict.
-for model in MODELS:
-    model["id"] = model.get("basename", os.path.basename(model["name"]))
-    if "basename" not in model:
-        model["basename"] = os.path.basename(model["name"])
-    if "shortname" not in model:
-        model["shortname"] = re.sub(r"(\-\d+|\-v\d.\d)$", "", model["id"])
-
-#: Experiment-1 model subset: all MODELS except the last three.
-models = MODELS[:-3]
+#: Experiment-1 model subset: all MODELS except the last three (commented placeholder entries).
+models = MODELS
 
 # ---------------------------------------------------------------------------
 # Datasets

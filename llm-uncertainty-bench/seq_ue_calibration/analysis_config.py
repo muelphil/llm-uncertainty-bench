@@ -13,7 +13,8 @@ from util.models import MODELS
 # ---------------------------------------------------------------------------
 
 models = [
-    m for m in MODELS
+    {**m, "shortname": "gemma-3-27b"} if m["basename"] == "gemma-3-27b-it" else m
+    for m in MODELS
     if m["type"] in ["instruct", "reasoning"] and "Magistral" not in m["name"]
 ]
 

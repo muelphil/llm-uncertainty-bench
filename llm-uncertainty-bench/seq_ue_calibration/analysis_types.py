@@ -98,7 +98,10 @@ class CalibrationEntry(TypedDict):
     """Mean certainty score across all items."""
 
     normalized_entropy: float
-    """Normalized entropy of the bucket-count distribution."""
+    """Normalized entropy of the bucket-count distribution (15 buckets)."""
+
+    normalized_entropy_100: float
+    """Normalized entropy of the bucket-count distribution (100 buckets)."""
 
     invalid_uq_method_scores: int
     """Number of rows dropped because the UQ method produced NaN."""
