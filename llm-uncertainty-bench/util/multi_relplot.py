@@ -49,6 +49,7 @@ def plot_multi_rel_diagram(
     legend_labels=None,
     ece_key='ce',
     ece_offset=0.035,
+    show_ece=False,
 ):
     """Plot multiple reliability diagrams overlaid on a single axes.
 
@@ -96,7 +97,7 @@ def plot_multi_rel_diagram(
             ax.plot(t, mu, color=colors_rgb[i], alpha=line_alpha, lw=base_linewidth)
 
         # smECE annotation
-        if ece_key and ece_key in diag:
+        if show_ece and ece_key and ece_key in diag:
             txt = f"d{i}: smECE={diag[ece_key]:.3f}"
             if legend_labels and i < len(legend_labels):
                 txt += f" ({legend_labels[i]})"

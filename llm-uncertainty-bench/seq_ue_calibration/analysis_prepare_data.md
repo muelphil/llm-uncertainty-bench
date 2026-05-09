@@ -64,13 +64,13 @@ from datasets_exp2 import (
 )
 
 # Timestamped print helper (used throughout to track long-running loops)
-from analysis_utils.misc_utils import print_with_time, extract_number
+from seq_ue_calibration.analysis_utils.misc_utils import print_with_time, extract_number
 
 # Filters out rows with failed answer extraction; counts unique answers per question ID
-from analysis_utils.dataframe_utils import filter_valid_answers, unique_count_distribution
+from seq_ue_calibration.analysis_utils.dataframe_utils import filter_valid_answers, unique_count_distribution
 
 # Shared configuration: model list, UQ method list, and output paths
-from analysis_config import (
+from seq_ue_calibration.analysis_config import (
     models,
     uq_methods,
     DATA_BASE_PATH,
@@ -175,18 +175,18 @@ def compute_arithmetic_metrics(df, dataset_id):
     diff_counts = unique_count_distribution(df, count_col)
 
     values = np.fromiter(diff_counts.keys(), dtype=float)
-    freqs  = np.fromiter(diff_counts.values(), dtype=float)
+    freqs = np.fromiter(diff_counts.values(), dtype=float)
 
     mean = np.average(values, weights=freqs)
-    std  = np.sqrt(np.average((values - mean) ** 2, weights=freqs))
+    std = np.sqrt(np.average((values - mean) ** 2, weights=freqs))
 
     return {
-        "totally_correct_questions":   totally_correct,
-        "accuracy_questions":          float(accuracy_questions),
-        "accuracy":                    accuracy,
-        "different_answer_count":      diff_counts,
+        "totally_correct_questions": totally_correct,
+        "accuracy_questions": float(accuracy_questions),
+        "accuracy": accuracy,
+        "different_answer_count": diff_counts,
         "different_answer_count_mean": float(mean),
-        "different_answer_count_std":  float(std),
+        "different_answer_count_std": float(std),
     }
 ```
 
@@ -207,16 +207,16 @@ def compute_binary_metrics(y_true: pd.Series, y_pred: pd.Series):
     fn = (~y_pred & y_true).sum()
 
     precision = tp / (tp + fp) if tp + fp else 0.0
-    recall    = tp / (tp + fn) if tp + fn else 0.0
-    accuracy  = (tp + tn) / (tp + tn + fp + fn) if tp + tn + fp + fn else 0.0
-    f1        = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    accuracy = (tp + tn) / (tp + tn + fp + fn) if tp + tn + fp + fn else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
 
     return {
         "tp": tp, "fp": fp, "tn": tn, "fn": fn,
         "precision": precision,
-        "recall":    recall,
-        "accuracy":  accuracy,
-        "f1":        f1,
+        "recall": recall,
+        "accuracy": accuracy,
+        "f1": f1,
     }
 
 
@@ -255,10 +255,10 @@ def compute_choice_question_accuracy(df):
     accuracy_questions = totally_correct_questions / len(question_counts)
 
     return {
-        "totally_correct_choices":   int(totally_correct_choices),
-        "accuracy_choices":          float(accuracy_choices),
+        "totally_correct_choices": int(totally_correct_choices),
+        "accuracy_choices": float(accuracy_choices),
         "totally_correct_questions": int(totally_correct_questions),
-        "accuracy_questions":        float(accuracy_questions),
+        "accuracy_questions": float(accuracy_questions),
     }
 
 
@@ -310,13 +310,13 @@ def compute_calibration_metrics(df, uq_method):
     Raises:
         ValueError: if ``df`` has no valid rows for the given UQ method.
     """
-    uq_method_id   = uq_method["id"]
+    uq_method_id = uq_method["id"]
     need_to_invert = uq_method["type"] == "uncertainty"
 
     cleared = df.dropna(subset=[uq_method_id])
     invalid_uq_method_scores = len(df) - len(cleared)
 
-    correct     = cleared["is_correct"].to_numpy()
+    correct = cleared["is_correct"].to_numpy()
     certainties = cleared[uq_method_id].to_numpy()
 
     if need_to_invert:
@@ -333,21 +333,22 @@ def compute_calibration_metrics(df, uq_method):
         y=correct.astype(float),
         plot_confidence_band=True,
         report_CE_std=True,
+        kde_bandwidth=0.02
     )
 
     return {
-        "bin_confidences":        bin_confs,
-        "bucket_accuracies":      bucket_accs,
-        "bucket_counts":          bucket_counts,
-        "correct":                correct,
-        "certainties":            certainties,
-        "ece":                    calculate_ece(bin_confs, bucket_accs, bucket_counts),
-        "auroc":                  roc_auc_score(correct, certainties),
-        "accuracy":               float(correct.mean()) if len(correct) else 0.0,
-        "average_certainty":      float(certainties.mean()),
-        "normalized_entropy":     calculate_normalized_entropy(bucket_counts),
+        "bin_confidences": bin_confs,
+        "bucket_accuracies": bucket_accs,
+        "bucket_counts": bucket_counts,
+        "correct": correct,
+        "certainties": certainties,
+        "ece": calculate_ece(bin_confs, bucket_accs, bucket_counts),
+        "auroc": roc_auc_score(correct, certainties),
+        "accuracy": float(correct.mean()) if len(correct) else 0.0,
+        "average_certainty": float(certainties.mean()),
+        "normalized_entropy": calculate_normalized_entropy(bucket_counts),
         "invalid_uq_method_scores": int(invalid_uq_method_scores),
-        "relplot_diagram":        relplot_diagram,
+        "relplot_diagram": relplot_diagram,
     }
 ```
 
@@ -358,7 +359,7 @@ def compute_calibration_metrics(df, uq_method):
 prepared_data = {}
 
 for dataset in datasets:
-    dataset_id   = dataset["id"]
+    dataset_id = dataset["id"]
     is_arithmetic = dataset_id in arithmetic_datasets_dict
 
     prepared_data[dataset_id] = {}
@@ -371,7 +372,7 @@ for dataset in datasets:
 
         entry = {
             "is_arithmetic": is_arithmetic,
-            "total_items":   len(raw_df),
+            "total_items": len(raw_df),
         }
 
         # Dataset-type-specific metrics and df extension

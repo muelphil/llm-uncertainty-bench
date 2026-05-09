@@ -57,7 +57,7 @@ from util.plot_empty import plot_empty
 
 ```python
 # Shared configuration: model list, UQ method list, and output paths
-from analysis_config import (
+from seq_ue_calibration.analysis_config import (
     models,
     uq_methods,
     RESOURCES_DIR,
@@ -69,17 +69,17 @@ from analysis_config import (
 
 ```python
 # Timestamped print helper (used throughout to track long-running loops)
-from analysis_utils.misc_utils import print_with_time
+from seq_ue_calibration.analysis_utils.misc_utils import print_with_time
 
 # Colour blending utility (lighten/darken named colours; used for bar-chart fill colours)
-from analysis_utils.color_utils import adjust_color, scale_fonts
+from seq_ue_calibration.analysis_utils.color_utils import adjust_color, scale_fonts
 
 # Counts unique answers per question id; used for the arithmetic histogram
-from analysis_utils.dataframe_utils import unique_count_distribution
+from seq_ue_calibration.analysis_utils.dataframe_utils import unique_count_distribution
 
 # Calibration subplot renderer, stats-table renderer, relplot wrapper, pre-built grid assembler
 # and legacy grid builders (used as-is from analysis.md for backward compat)
-from analysis_utils.calibration_plot_helpers import (
+from seq_ue_calibration.analysis_utils.calibration_plot_helpers import (
     plot_calibration_subplot,
     plot_calibration_stats_table,
     plot_relplot_subplot,
@@ -89,14 +89,14 @@ from analysis_utils.calibration_plot_helpers import (
 )
 
 # LaTeX table builders: accuracy comparison, response-length stats, scalar metric table
-from analysis_utils.latex_utils import (
+from seq_ue_calibration.analysis_utils.latex_utils import (
     make_accuracy_table_latex,
     make_length_table_latex,
     make_scalar_table_latex,
 )
 
 # Donut-chart grid for verbalized confidence distributions; bar-chart grid for P(True) bucket counts
-from analysis_utils.distribution_plots import plot_donut_row_with_other, plot_bucket_distribution
+from seq_ue_calibration.analysis_utils.distribution_plots import plot_donut_row_with_other, plot_bucket_distribution
 ```
 
 ## Setup
@@ -632,4 +632,40 @@ fig = plot_bucket_distribution(ptrue_bucket_counts, models)
 for ext in ["svg", "pdf", "png"]:
     plt.savefig(FIGURES_DIR / f"ptrue_bucket_counts_full.{ext}", bbox_inches="tight")
 plt.show()
+```
+
+```python
+import matplotlib.pyplot as plt
+
+# Sample data
+x = [1, 2, 3, 4, 5]
+y = [1, 4, 9, 16, 25]
+
+# Create plot
+plt.plot(x, y)
+plt.xlabel("x")
+plt.ylabel("y")
+plt.title("Simple Plot")
+
+# Save figure
+plt.savefig("plot.png", dpi=300, bbox_inches="tight")
+
+# Optional: display it
+plt.show()
+```
+
+```python
+
+```
+
+```python
+
+```
+
+```python
+
+```
+
+```python
+
 ```
