@@ -21,7 +21,7 @@ models = [
 uq_methods = [
     {"label": "Verbalized Uncertainty", "id": "verbalized",          "type": "certainty", "n_bins": 15},
     {"label": "P(True)",                "id": "p_true",              "type": "certainty", "n_bins": 15},
-    {"label": "Frequency of Answer",    "id": "frequency_of_answer", "type": "certainty", "n_bins": 11},
+    {"label": "Frequency of Answer",    "id": "frequency_of_answer", "type": "certainty", "n_bins": 11, "discrete": True},
     {"label": "CCP",                    "id": "ccp",                 "type": "certainty", "n_bins": 15},
 ]
 

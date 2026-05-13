@@ -46,6 +46,7 @@ from sklearn.metrics import roc_auc_score
 
 ```python
 from calibration_visualization import (
+    calculate_calibration_data,
     calculate_calibration_data_discrete,
     calculate_ece,
     calculate_normalized_entropy,
@@ -323,9 +324,9 @@ def compute_calibration_metrics(df, uq_method):
         certainties = 1.0 - certainties
 
     n_bins = uq_method.get("n_bins", 15)
-    bin_confs, bucket_accs, bucket_counts = calculate_calibration_data_discrete(
-        correct, certainties, n_bins
-    )
+    calc_fn = calculate_calibration_data_discrete if uq_method.get("discrete", False) \
+              else calculate_calibration_data
+    bin_confs, bucket_accs, bucket_counts = calc_fn(correct, certainties, n_bins)
 
     # https://github.com/apple/ml-calibration/blob/main/src/relplot/diagrams.py
     relplot_diagram = rp.prepare_rel_diagram(
@@ -403,6 +404,36 @@ for dataset in datasets:
                 entry["cal"][uq_method_id] = None
 
         prepared_data[dataset_id][model_id] = entry
+```
+
+## Token Length Statistics
+
+For each model/dataset pair compute mean and standard deviation of
+`answer_token_len`, `reasoning_token_len`, and their sum (`combined`).
+Persisted to JSON so the visualization notebook can load it without rerunning
+the full preparation loop.
+
+```python
+token_length_stats = {}
+
+for dataset in datasets:
+    ds_id = dataset["id"]
+    token_length_stats[ds_id] = {}
+    for model in models:
+        raw_df = data[ds_id][model["id"]]
+        answer   = raw_df["answer_token_len"]
+        reasoning = raw_df["reasoning_token_len"] if "reasoning_token_len" in raw_df else pd.Series([0])
+        combined  = answer + reasoning
+        token_length_stats[ds_id][model["id"]] = {
+            "answer":    {"mean": float(answer.mean()),    "std": float(answer.std())},
+            "reasoning": {"mean": float(reasoning.mean()), "std": float(reasoning.std())},
+            "combined":  {"mean": float(combined.mean()),  "std": float(combined.std())},
+        }
+
+with open(RESOURCES_DIR / "token_length_stats.json", "w", encoding="utf-8") as f:
+    json.dump(token_length_stats, f, indent=4, ensure_ascii=False, cls=NumpyEncoder)
+
+print("Saved token length stats.")
 ```
 
 ## Save pickle

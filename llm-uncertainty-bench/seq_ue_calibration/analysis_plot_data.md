@@ -93,6 +93,7 @@ from seq_ue_calibration.analysis_utils.latex_utils import (
     make_accuracy_table_latex,
     make_length_table_latex,
     make_scalar_table_latex,
+    make_token_length_table_latex,
 )
 
 # Donut-chart grid for verbalized confidence distributions; bar-chart grid for P(True) bucket counts
@@ -148,6 +149,9 @@ with open(RESOURCES_DIR / "accuracy_per_ds_per_model_mc.json", encoding="utf-8")
 
 with open(RESOURCES_DIR / "accuracy_per_ds_per_model_arithmetic.json", encoding="utf-8") as f:
     accuracy_per_ds_per_model_arithmetic = json.load(f)
+
+with open(RESOURCES_DIR / "token_length_stats.json", encoding="utf-8") as f:
+    token_length_stats = json.load(f)
 ```
 
 ## Derived data
@@ -182,17 +186,18 @@ for model in models:
 
 ```python
 # length_metadata[dataset_id][model_id] = {"sum", "mean", "std"} for answer_token_len
-length_metadata = {}
-for dataset in datasets:
-    ds_id = dataset["id"]
-    length_metadata[ds_id] = {}
-    for model in models:
-        lengths = prepared_data[ds_id][model["id"]]["df"]["answer_token_len"]
-        length_metadata[ds_id][model["id"]] = {
-            "sum":  int(lengths.sum()),
-            "mean": float(lengths.mean()),
-            "std":  float(lengths.std()),
+# (backward-compatible with make_length_table_latex; populated from token_length_stats)
+length_metadata = {
+    ds_id: {
+        model["id"]: {
+            "mean": token_length_stats[ds_id][model["id"]]["answer"]["mean"],
+            "std":  token_length_stats[ds_id][model["id"]]["answer"]["std"],
         }
+        for model in models
+    }
+    for dataset in datasets
+    for ds_id in [dataset["id"]]
+}
 ```
 
 ## Pre-build subplot callables
@@ -634,36 +639,158 @@ for ext in ["svg", "pdf", "png"]:
 plt.show()
 ```
 
+## Token Length Tables
+
+Three LaTeX tables (rows = models, columns = datasets), one for each length variant:
+`answer_token_len`, `reasoning_token_len`, and their sum.  A final *Mean* row
+in each table shows the average of per-model means for each dataset column,
+giving the dataset-level expected response length collapsed across models.
+
 ```python
-import matplotlib.pyplot as plt
+dataset_ids_for_length = list(datasets_combined)
 
-# Sample data
-x = [1, 2, 3, 4, 5]
-y = [1, 4, 9, 16, 25]
+_token_length_specs = [
+    ("answer",    "Answer Token Length by Model and Dataset",            "token_lengths_answer"),
+    ("reasoning", "Reasoning Token Length by Model and Dataset",         "token_lengths_reasoning"),
+    ("combined",  "Combined (Answer + Reasoning) Token Length by Model and Dataset",
+                  "token_lengths_combined"),
+]
 
-# Create plot
-plt.plot(x, y)
-plt.xlabel("x")
-plt.ylabel("y")
-plt.title("Simple Plot")
+for length_key, caption, filename in _token_length_specs:
+    latex_table = make_token_length_table_latex(
+        token_length_stats,
+        models=models,
+        dataset_ids=dataset_ids_for_length,
+        length_key=length_key,
+        caption=caption,
+    )
+    out_path = TABLES_DIR / f"{filename}.tex"
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(latex_table)
+    print(f"Saved {out_path}")
+    print(latex_table)
+    print()
+```
 
-# Save figure
-plt.savefig("plot.png", dpi=300, bbox_inches="tight")
+## Token Length Plots
 
-# Optional: display it
+Stacked bar chart: answer tokens (bottom) + reasoning tokens (top) per model per
+dataset.  Each group of bars corresponds to one dataset; within the group, bars
+are ordered by model.  Error bars are placed on the combined total only (stacking
+individual errors would be misleading).  A second figure shows the same data
+split into three subplots (answer-only, reasoning-only, combined) for easier
+comparison.
+
+```python
+_ds_ids   = [ds["id"] for ds in datasets]
+_ds_labels = [ds["id"].replace("_", "-") for ds in datasets]
+_n_ds  = len(_ds_ids)
+_n_mod = len(models)
+
+# Colour scheme: instruct = blue-ish, reasoning = green-ish
+_ANSWER_COLORS    = {m["id"]: adjust_color("tab:blue",  0.65, lighten=True) if m["type"] == "instruct"
+                               else adjust_color("tab:green", 0.65, lighten=True) for m in models}
+_REASONING_COLORS = {m["id"]: adjust_color("tab:blue",  0.35, lighten=True) if m["type"] == "instruct"
+                               else adjust_color("tab:green", 0.35, lighten=True) for m in models}
+
+bar_width = 0.8 / _n_mod
+group_positions = np.arange(_n_ds)
+
+fig_stacked, ax_stacked = plt.subplots(figsize=(_n_ds * max(_n_mod * 0.6, 1.2) + 1.5, 5))
+
+for j, model in enumerate(models):
+    mid = model["id"]
+    offsets = group_positions + (j - (_n_mod - 1) / 2) * bar_width
+
+    ans_means = [token_length_stats[ds_id][mid]["answer"]["mean"]    for ds_id in _ds_ids]
+    rea_means = [token_length_stats[ds_id][mid]["reasoning"]["mean"] for ds_id in _ds_ids]
+    com_stds  = [token_length_stats[ds_id][mid]["combined"]["std"]   for ds_id in _ds_ids]
+
+    ax_stacked.bar(
+        offsets, ans_means,
+        width=bar_width,
+        color=_ANSWER_COLORS[mid],
+        edgecolor="black", linewidth=0.5,
+        label=f"{model['shortname']} (answer)" if j == 0 else "_nolegend_",
+    )
+    ax_stacked.bar(
+        offsets, rea_means,
+        width=bar_width,
+        bottom=ans_means,
+        color=_REASONING_COLORS[mid],
+        edgecolor="black", linewidth=0.5,
+        label=f"{model['shortname']} (reasoning)" if j == 0 else "_nolegend_",
+    )
+    combined_means = [a + r for a, r in zip(ans_means, rea_means)]
+    ax_stacked.errorbar(
+        offsets, combined_means,
+        yerr=com_stds,
+        fmt="none", ecolor="black", capsize=3, linewidth=1,
+    )
+
+# Legend: one entry per model (colour block showing answer shade)
+legend_patches = [
+    plt.Rectangle((0, 0), 1, 1,
+                   facecolor=_ANSWER_COLORS[m["id"]], edgecolor="black", linewidth=0.5,
+                   label=m["shortname"])
+    for m in models
+]
+answer_patch    = plt.Rectangle((0, 0), 1, 1, facecolor="white", edgecolor="black",
+                                  hatch="", label="■ Answer tokens (lighter shade)")
+reasoning_patch = plt.Rectangle((0, 0), 1, 1, facecolor="grey", edgecolor="black",
+                                  hatch="", label="■ Reasoning tokens (darker shade)")
+
+ax_stacked.set_xticks(group_positions)
+ax_stacked.set_xticklabels(_ds_labels, rotation=20, ha="right")
+ax_stacked.set_ylabel("Mean token count")
+ax_stacked.set_title("Response Token Lengths per Model and Dataset\n(stacked: answer + reasoning; error bars = ±1 SD of combined)")
+ax_stacked.legend(handles=legend_patches + [answer_patch, reasoning_patch],
+                  loc="upper left", fontsize=8, ncol=2)
+
+plt.tight_layout()
+for ext in ["svg", "pdf", "png"]:
+    fig_stacked.savefig(FIGURES_DIR / f"token_lengths_stacked.{ext}", bbox_inches="tight")
 plt.show()
 ```
 
 ```python
+# Three-subplot breakdown: answer-only, reasoning-only, combined
+_subplot_specs = [
+    ("answer",    "Answer token length",             "tab:blue"),
+    ("reasoning", "Reasoning token length",          "tab:green"),
+    ("combined",  "Combined token length\n(answer + reasoning)", "tab:purple"),
+]
 
-```
+fig_trio, axes_trio = plt.subplots(1, 3, figsize=(_n_ds * max(_n_mod * 0.55, 1.0) * 3 + 1, 5),
+                                    sharey=False)
 
-```python
+for ax, (length_key, subplot_title, base_color) in zip(axes_trio, _subplot_specs):
+    model_colors = [adjust_color(base_color, 0.4 + 0.3 * k / max(_n_mod - 1, 1), lighten=True)
+                    for k in range(_n_mod)]
 
-```
+    for j, (model, col) in enumerate(zip(models, model_colors)):
+        mid = model["id"]
+        offsets = group_positions + (j - (_n_mod - 1) / 2) * bar_width
+        means = [token_length_stats[ds_id][mid][length_key]["mean"] for ds_id in _ds_ids]
+        stds  = [token_length_stats[ds_id][mid][length_key]["std"]  for ds_id in _ds_ids]
 
-```python
+        ax.bar(offsets, means, width=bar_width, color=col,
+               edgecolor="black", linewidth=0.5,
+               label=model["shortname"])
+        ax.errorbar(offsets, means, yerr=stds,
+                    fmt="none", ecolor="black", capsize=3, linewidth=1)
 
+    ax.set_xticks(group_positions)
+    ax.set_xticklabels(_ds_labels, rotation=20, ha="right")
+    ax.set_ylabel("Mean token count")
+    ax.set_title(subplot_title)
+    ax.legend(fontsize=7, ncol=1)
+
+fig_trio.suptitle("Token Length Breakdown by Model and Dataset (mean ± 1 SD)", y=1.02)
+plt.tight_layout()
+for ext in ["svg", "pdf", "png"]:
+    fig_trio.savefig(FIGURES_DIR / f"token_lengths_breakdown.{ext}", bbox_inches="tight")
+plt.show()
 ```
 
 ```python
