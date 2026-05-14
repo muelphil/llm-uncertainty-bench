@@ -235,13 +235,15 @@ for dataset in datasets:
                     "table":   plot_empty,
                 }
             else:
-                smooth_ece         = cal_entry["relplot_diagram"]["ce"]
-                smooth_ece_ci_width = cal_entry["relplot_diagram"].get("ce_ci_width")
+                relplot_diagram     = cal_entry.get("relplot_diagram")
+                smooth_ece          = relplot_diagram["ce"]              if relplot_diagram is not None else None
+                smooth_ece_ci_width = relplot_diagram.get("ce_ci_width") if relplot_diagram is not None else None
                 subplots[ds_id][mid][uq_id] = {
                     "cal":     partial(plot_calibration_subplot,
                                        data_item=cal_entry, model_type=model["type"]),
                     "relplot": partial(plot_relplot_subplot,
-                                       data_item=cal_entry, model_type=model["type"]),
+                                       data_item=cal_entry, model_type=model["type"])
+                               if relplot_diagram is not None else plot_empty,
                     "table":   partial(plot_calibration_stats_table,
                                        data_item=cal_entry,
                                        total_items=entry["total_items"],
@@ -460,30 +462,50 @@ for model in models:
 Same grid layout but each subplot is a kernel-smoothed reliability diagram.
 
 ```python
-for model in models:
-    for with_table in [True, False]:
-        print_with_time(f"Creating relplot grid for {model['name']} (with_table={with_table}) ...")
-        suffix = "_with_table" if with_table else ""
-        fig = build_grid_by_model(model, datasets, "relplot", with_table)
-        for ext in ["svg", "png"]:
-            fig.savefig(FIGURES_DIR / f"by_model/{model['id']}_calibration_plots{suffix}_relplot.{ext}",
-                        bbox_inches="tight")
-        plt.close(fig)
+_missing_relplot = sum(
+    1
+    for ds in datasets
+    for model in models
+    for uq in uq_methods
+    if (prepared_data[ds["id"]][model["id"]]["cal"].get(uq["id"]) or {}).get("relplot_diagram") is None
+)
+if _missing_relplot:
+    print(f"Skipping relplot grids by model: {_missing_relplot} relplot_diagram(s) missing.")
+else:
+    for model in models:
+        for with_table in [True, False]:
+            print_with_time(f"Creating relplot grid for {model['name']} (with_table={with_table}) ...")
+            suffix = "_with_table" if with_table else ""
+            fig = build_grid_by_model(model, datasets, "relplot", with_table)
+            for ext in ["svg", "png"]:
+                fig.savefig(FIGURES_DIR / f"by_model/{model['id']}_calibration_plots{suffix}_relplot.{ext}",
+                            bbox_inches="tight")
+            plt.close(fig)
 
-# Restore matplotlib defaults after relplot rendering (relplot's set_default_style()
-# calls mpl.rc_file_defaults() as a side-effect; individual calls are guarded in
-# plot_relplot_subplot, but this is a belt-and-suspenders reset for good measure).
-apply_matplotlib_defaults()
+    # Restore matplotlib defaults after relplot rendering (relplot's set_default_style()
+    # calls mpl.rc_file_defaults() as a side-effect; individual calls are guarded in
+    # plot_relplot_subplot, but this is a belt-and-suspenders reset for good measure).
+    apply_matplotlib_defaults()
 ```
 
 ```python
-for model in models:
-    fig = build_grid_by_model(model, short_datasets, "relplot", with_table=False, with_title=False)
-    for ext in ["svg", "png"]:
-        fig.savefig(FIGURES_DIR / f"by_model/short_{model['id']}_calibration_plots_short_relplot.{ext}",
-                    bbox_inches="tight")
-    plt.close(fig)
-apply_matplotlib_defaults()
+_missing_relplot_short = sum(
+    1
+    for ds in short_datasets
+    for model in models
+    for uq in uq_methods
+    if (prepared_data[ds["id"]][model["id"]]["cal"].get(uq["id"]) or {}).get("relplot_diagram") is None
+)
+if _missing_relplot_short:
+    print(f"Skipping short relplot grids by model: {_missing_relplot_short} relplot_diagram(s) missing.")
+else:
+    for model in models:
+        fig = build_grid_by_model(model, short_datasets, "relplot", with_table=False, with_title=False)
+        for ext in ["svg", "png"]:
+            fig.savefig(FIGURES_DIR / f"by_model/short_{model['id']}_calibration_plots_short_relplot.{ext}",
+                        bbox_inches="tight")
+        plt.close(fig)
+    apply_matplotlib_defaults()
 ```
 
 ## Calibration Plots by UQ Method
@@ -508,19 +530,29 @@ for uq_method in uq_methods:
 ## Calibration Plots by UQ Method (relplot)
 
 ```python
-for uq_method in uq_methods:
-    for with_table in [True, False]:
-        print_with_time(f"Creating relplot grid for {uq_method['label']} (with_table={with_table}) ...")
-        label_safe = uq_method["label"].replace(" ", "_")
-        suffix = "_with_table" if with_table else ""
-        fig = build_grid_by_uq_method(uq_method, datasets, models, "relplot", with_table)
-        for ext in ["svg", "png"]:
-            fig.savefig(
-                FIGURES_DIR / f"by_uq_method/uq_method_{label_safe}_calibration_plots{suffix}_relplot.{ext}",
-                bbox_inches="tight",
-            )
-        plt.close(fig)
-apply_matplotlib_defaults()
+_missing_relplot_uq = sum(
+    1
+    for ds in datasets
+    for model in models
+    for uq in uq_methods
+    if (prepared_data[ds["id"]][model["id"]]["cal"].get(uq["id"]) or {}).get("relplot_diagram") is None
+)
+if _missing_relplot_uq:
+    print(f"Skipping relplot grids by UQ method: {_missing_relplot_uq} relplot_diagram(s) missing.")
+else:
+    for uq_method in uq_methods:
+        for with_table in [True, False]:
+            print_with_time(f"Creating relplot grid for {uq_method['label']} (with_table={with_table}) ...")
+            label_safe = uq_method["label"].replace(" ", "_")
+            suffix = "_with_table" if with_table else ""
+            fig = build_grid_by_uq_method(uq_method, datasets, models, "relplot", with_table)
+            for ext in ["svg", "png"]:
+                fig.savefig(
+                    FIGURES_DIR / f"by_uq_method/uq_method_{label_safe}_calibration_plots{suffix}_relplot.{ext}",
+                    bbox_inches="tight",
+                )
+            plt.close(fig)
+    apply_matplotlib_defaults()
 ```
 
 ## Response Lengths Table
