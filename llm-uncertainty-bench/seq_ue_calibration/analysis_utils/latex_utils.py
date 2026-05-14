@@ -4,6 +4,7 @@ All functions return a complete LaTeX snippet as a string; the caller is
 responsible for writing it to a file.
 """
 
+import numpy as np
 
 def make_accuracy_table_latex(data_dict, properties_labels, model_ids, caption):
     """Generate a LaTeX booktabs table comparing accuracy metrics across models and datasets.
@@ -90,6 +91,81 @@ def make_length_table_latex(length_metadata, model_ids, dataset_ids,
     lines += [
         r"      \bottomrule", r"    \end{tabular}%", r"  }",
         rf"  \caption{{{caption}}}", r"\end{table}",
+    ]
+    return "\n".join(lines)
+
+
+def make_token_length_table_latex(token_length_stats, models, dataset_ids, length_key,
+                                  caption="Response Token Lengths by Model and Dataset"):
+    """Generate a LaTeX table of mean ± std token lengths, rows=models, cols=datasets.
+
+    A final ``Mean`` row is appended that averages each dataset column's per-model
+    means (giving the average response length for that dataset across all models).
+
+    Args:
+        token_length_stats: Nested dict ``token_length_stats[dataset_id][model_id]``
+            with sub-keys ``"answer"``, ``"reasoning"``, and ``"combined"``, each
+            holding ``"mean"`` and ``"std"`` float values.
+        models: Ordered list of model dicts with ``"id"`` and ``"shortname"`` keys.
+        dataset_ids: Ordered list of dataset ID strings (become column headers).
+        length_key: Which token-length variant to tabulate – one of
+            ``"answer"``, ``"reasoning"``, or ``"combined"``.
+        caption: Table caption string used inside ``\\caption``.
+
+    Returns:
+        str: Complete LaTeX table code.
+    """
+    n_datasets = len(dataset_ids)
+    col_spec = "l " + " ".join(["r r"] * n_datasets)
+
+    lines = [
+        r"\begin{table}[ht]",
+        r"  \centering",
+        r"  \makebox[\textwidth][c]{%",
+        f"    \\begin{{tabular}}{{{col_spec}}}",
+        r"      \toprule",
+    ]
+
+    # Header row: one multicolumn (mean / ±std) per dataset
+    header_cells = ["Model"] + [
+        rf"\multicolumn{{2}}{{c}}{{\parbox[t]{{0mm}}{{\rotatebox{{60}}{{{ds_id.replace('_', ' ')}}}}}}}"
+        for ds_id in dataset_ids
+    ]
+    lines.append("      " + " & ".join(header_cells) + r" \\")
+    lines.append(r"      \midrule")
+
+    # Sub-header: Mean / ±Std per dataset column
+    subcells = [""] + [item for _ in dataset_ids for item in [r"Mean", r"$\pm$Std"]]
+    lines.append("      " + " & ".join(subcells) + r" \\")
+    lines.append(r"      \midrule")
+
+    # One data row per model
+    dataset_col_means = {ds_id: [] for ds_id in dataset_ids}
+    for model in models:
+        mid = model["id"]
+        row = [model["shortname"]]
+        for ds_id in dataset_ids:
+            stats = token_length_stats[ds_id][mid][length_key]
+            mean_val = stats["mean"]
+            std_val = stats["std"]
+            dataset_col_means[ds_id].append(mean_val)
+            row += [f"{mean_val:.1f}", f"{std_val:.1f}"]
+        lines.append("      " + " & ".join(row) + r" \\")
+
+    # Final "Mean" row: average of per-model means per dataset column
+    lines.append(r"      \midrule")
+    avg_row = [r"\textit{Mean}"]
+    for ds_id in dataset_ids:
+        col_mean = float(np.mean(dataset_col_means[ds_id]))
+        avg_row += [f"{col_mean:.1f}", ""]
+    lines.append("      " + " & ".join(avg_row) + r" \\")
+
+    lines += [
+        r"      \bottomrule",
+        r"    \end{tabular}%",
+        r"  }",
+        rf"  \caption{{{caption}}}",
+        r"\end{table}",
     ]
     return "\n".join(lines)
 

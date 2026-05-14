@@ -332,7 +332,7 @@ def compute_calibration_metrics(df, uq_method):
     n_bins = uq_method.get("n_bins", 15)
     calc_fn = calculate_calibration_data_discrete if uq_method.get("discrete", False) \
               else calculate_calibration_data
-    bin_confs, bucket_accs, bucket_counts = calc_fn(correct, certainties, n_bins)
+    bin_confs, bucket_accs, bucket_counts, bucket_acc_ci, ece_ci = calc_fn(correct, certainties, n_bins)
 
     # https://github.com/apple/ml-calibration/blob/main/src/relplot/diagrams.py
     relplot_diagram = rp.prepare_rel_diagram(
@@ -347,9 +347,11 @@ def compute_calibration_metrics(df, uq_method):
         "bin_confidences": bin_confs,
         "bucket_accuracies": bucket_accs,
         "bucket_counts": bucket_counts,
+        "bucket_acc_ci": bucket_acc_ci,
         "correct": correct,
         "certainties": certainties,
         "ece": calculate_ece(bin_confs, bucket_accs, bucket_counts),
+        "ece_ci": ece_ci,
         "auroc": roc_auc_score(correct, certainties),
         "accuracy": float(correct.mean()) if len(correct) else 0.0,
         "average_certainty": float(certainties.mean()),

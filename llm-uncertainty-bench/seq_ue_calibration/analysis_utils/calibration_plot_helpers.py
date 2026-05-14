@@ -26,7 +26,8 @@ def plot_calibration_subplot(ax, data_item, model_type):
     Args:
         ax: Matplotlib ``Axes`` to draw on.
         data_item: Calibration metrics dict with keys ``"bin_confidences"``,
-            ``"bucket_accuracies"``, and ``"bucket_counts"``.
+            ``"bucket_accuracies"``, ``"bucket_counts"``, ``"ece"``, and
+            optionally ``"bucket_acc_ci"`` and ``"ece_ci"``.
         model_type: Model type string (``"instruct"`` or ``"reasoning"``);
             selects the colour palette via ``CALIBRATION_PLOT_COLORS``.
     """
@@ -35,6 +36,9 @@ def plot_calibration_subplot(ax, data_item, model_type):
         ax=ax, colormap=CALIBRATION_PLOT_COLORS[model_type],
         fontsize=20, tick_fontsize=18,
         xlabel="Confidence Bins", ylabel="Accuracy in Bin",
+        ece=data_item.get("ece"),
+        bucket_acc_ci=data_item.get("bucket_acc_ci"),
+        ece_ci=data_item.get("ece_ci"),
     )
 
 
@@ -75,6 +79,9 @@ def plot_calibration_stats_table(ax, data_item, total_items=None, invalid_answer
     table_rows = [
         ["ECE", f"{data_item['ece']:.4f}"],
     ]
+    ece_ci = data_item.get("ece_ci")
+    if ece_ci is not None:
+        table_rows.append(["ECE CI", f"[{ece_ci[0]:.4f}\u2013{ece_ci[1]:.4f}]"])
     if smooth_ece is not None:
         if smooth_ece_ci_width is not None:
             smece_str = f"{float(smooth_ece):.4f} ± {float(smooth_ece_ci_width):.4f}"
