@@ -85,6 +85,11 @@ from seq_ue_calibration.analysis_config import (
 ## Setup
 
 ```python
+# Set to True to compute relplot (kernel-smoothed) reliability diagrams and store them
+# in the pickle.  Disabled by default because it is slow and plot_data handles the
+# missing key gracefully (smECE is omitted from tables, relplot grids are skipped).
+COMPUTE_RELPLOTS = False
+
 for d in [RESOURCES_DIR, FIGURES_DIR, TABLES_DIR]:
     os.makedirs(d, exist_ok=True)
 
@@ -294,6 +299,7 @@ def compute_calibration_metrics(df, uq_method):
 
     Also calls ``relplot.prepare_rel_diagram`` so the diagram object can later be fed
     directly to ``relplot.plot_rel_diagram`` in the visualization notebook.
+    Skipped when the module-level ``COMPUTE_RELPLOTS`` flag is ``False``.
 
     Args:
         df: Filtered DataFrame (invalid answers already removed).
@@ -306,7 +312,7 @@ def compute_calibration_metrics(df, uq_method):
             ece (float), auroc (float), accuracy (float),
             average_certainty (float), normalized_entropy (float),
             invalid_uq_method_scores (int),
-            relplot_diagram (relplot diagram object).
+            relplot_diagram (relplot diagram object, or absent when COMPUTE_RELPLOTS=False).
 
     Raises:
         ValueError: if ``df`` has no valid rows for the given UQ method.
@@ -335,9 +341,9 @@ def compute_calibration_metrics(df, uq_method):
         plot_confidence_band=True,
         report_CE_std=True,
         kde_bandwidth=0.02
-    )
+    ) if COMPUTE_RELPLOTS else None
 
-    return {
+    result = {
         "bin_confidences": bin_confs,
         "bucket_accuracies": bucket_accs,
         "bucket_counts": bucket_counts,
@@ -349,8 +355,10 @@ def compute_calibration_metrics(df, uq_method):
         "average_certainty": float(certainties.mean()),
         "normalized_entropy": calculate_normalized_entropy(bucket_counts),
         "invalid_uq_method_scores": int(invalid_uq_method_scores),
-        "relplot_diagram": relplot_diagram,
     }
+    if relplot_diagram is not None:
+        result["relplot_diagram"] = relplot_diagram
+    return result
 ```
 
 ## Main population loop
