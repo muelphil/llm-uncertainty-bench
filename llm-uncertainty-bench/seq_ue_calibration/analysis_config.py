@@ -13,15 +13,15 @@ from util.models import MODELS
 # ---------------------------------------------------------------------------
 
 models = [
-    {**m, "shortname": "gemma-3-27b"} if m["basename"] == "gemma-3-27b-it" else m
+    m
     for m in MODELS
-    if m["type"] in ["instruct", "reasoning"] and "Magistral" not in m["name"]
+    if m["type"] in ["instruct", "reasoning"]# and "Magistral" not in m["name"]
 ]
 
 uq_methods = [
     {"label": "Verbalized Uncertainty", "id": "verbalized",          "type": "certainty", "n_bins": 15},
     {"label": "P(True)",                "id": "p_true",              "type": "certainty", "n_bins": 15},
-    {"label": "Frequency of Answer",    "id": "frequency_of_answer", "type": "certainty", "n_bins": 11, "discrete": True},
+    {"label": "Answer Consistency",     "id": "frequency_of_answer", "type": "certainty", "n_bins": 11, "discrete": True},
     {"label": "CCP",                    "id": "ccp",                 "type": "certainty", "n_bins": 15},
 ]
 

@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
 import numpy as np
+import matplotlib.colors as mcolors
 
 def shorten_number(num: float) -> str:
     """
@@ -103,27 +105,35 @@ def plot_calibration_curve(bin_confidences, bucket_accuracies, bucket_counts, co
         yerr_upper = np.clip(bucket_acc_ci[:, 1] - bucket_accuracies, 0, None)
         ax.errorbar(bin_confidences, bucket_accuracies,
                     yerr=[yerr_lower, yerr_upper],
-                    fmt="none", color="black", capsize=3, linewidth=1, zorder=5)
+                    fmt="none", color="#555555", capsize=3, linewidth=1, zorder=5)
 
     # Plot the identity line (f(x) = x)
     ax.plot([0, 2], [0, 2], linestyle="--", color="gray")
 
-    # Add bucket counts as labels
-    for bar, count in zip(bars, bucket_counts):
+    # Add bucket counts as labels (rendered above CI bars via high zorder)
+    for bar, count, bar_color in zip(bars, bucket_counts, colors):
         height = bar.get_height()
         x = bar.get_x() + bar.get_width() / 2
         label = shorten_number(count)
 
-        if height > 0.5:  # place inside the bar
-            y = height - 0.05  # just below top
+        if height > 0.5:
+            # Inside bar: adaptive text color; outline matches the bucket bar color
+            r, g, b = bar_color[0], bar_color[1], bar_color[2]
+            brightness = (r + g + b) / 3.0
+            font_color = "black" if brightness > 0.6 else "white"
+            outline_color = bar_color  # same as bar face color
+            y = height - 0.05
             va = "top"
-            color = "white"
-        else:  # place above the bar
+        else:
+            # Above bar: black text with white outline
+            font_color = "black"
+            outline_color = "white"
             y = height + 0.02
             va = "bottom"
-            color = "black"
 
-        ax.text(x, y, label, ha="center", va=va, fontsize=count_fontsize, color=color)
+        ax.text(x, y, label, ha="center", va=va, fontsize=count_fontsize,
+                color=font_color, zorder=6,
+                path_effects=[pe.withStroke(linewidth=2, foreground=mcolors.to_rgba(outline_color, alpha=0.6) )])
 
 
     # Display the ECE in the upper left corner
