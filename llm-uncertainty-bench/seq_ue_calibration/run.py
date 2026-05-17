@@ -15,7 +15,7 @@ from benchmark_datasets import DATASETS
 from builders import build_encoders_builder, build_model_from_config_builder, build_model_from_config
 from leaf_nodes import AnsweredCorrectlyArithmeticSimple, AnsweredCorrectlyMC, ConclusionProbabilityExtractor, \
     SciBenchAnswerFrequency, Verbalized2SUEExtractor
-from models import MODELS, DEFAULTS
+from util.models import MODELS, DEFAULTS
 from nodes import MCQAAPriCoTResponseGenerator, MCQAAPriCoTResponseGeneratorPost, ArithmeticResponseGeneratorPre, ArithmeticResponseGeneratorPost, \
     OriginalPTrueApricot, OriginalPTrueArithmetic, VerbalizedArithmetic, Verbalized2SApricot, \
     ClaimConditionedProbability, GreedyAlternativesSimpleNLICalculator

@@ -10,7 +10,7 @@ from async_graph_bench import DiskCacheStore, NodeConfig, BenchmarkManager, CSVD
 from benchmark_datasets import datasets
 from builders import build_model_from_config
 from data_sources import get_prompt_1, get_prompt_2, get_prompt_3, get_prompt_4
-from models import MODELS, DEFAULTS
+from util.models import MODELS, DEFAULTS
 from nodes import LabelProbExtractor, MultipleChoiceLabelProbGenerator, MultipleChoiceLabelProbGeneratorMagistral
 
 NodeConfig.base_config = {"queue_size": 100, "prop_name": "estimations"}
