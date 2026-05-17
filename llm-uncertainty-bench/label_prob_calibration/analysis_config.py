@@ -84,7 +84,7 @@ PREPARED_DATA_PATH = RESOURCES_DIR / "prepared_data.pkl"
 #: variants and roughly halve the relplot bootstrap-CI computation cost.
 #: The ``chosen_only=True`` variants (``"norm_chosen"``, ``"raw_chosen"``) are
 #: always computed regardless of this flag.
-COMPUTE_RELPLOT_FOR_ALL_VARIANTS: bool = True
+COMPUTE_RELPLOT_FOR_ALL_VARIANTS: bool = False
 
 # ---------------------------------------------------------------------------
 # Utilities

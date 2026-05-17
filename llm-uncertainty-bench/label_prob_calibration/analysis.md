@@ -222,6 +222,21 @@ for prompt, dataset, model in product(prompt_designs, all_datasets, models):
 ```
 
 ```python
+import pickle
+
+def save_cal_data(cal_data, filename):
+    with open(filename, "wb") as f:
+        pickle.dump(cal_data, f)
+
+def load_cal_data(filename):
+    with open(filename, "rb") as f:
+        return pickle.load(f)
+
+# save_cal_data(cal_data, "analysis_cache.pkl")
+# cal_data = load_cal_data("analysis_cache.pkl")
+```
+
+```python
 # Normalise accumulated label-bias counts to proportions (must sum to 1 per model).
 labels_chosen_proportion = {}
 for m_id, counts in labels_chosen_count.items():
@@ -739,5 +754,218 @@ ax.grid(axis="y", linestyle="--", alpha=0.5)
 plt.tight_layout()
 for ext in ["svg", "pdf"]:
     plt.savefig(FIGURES_DIR / f"label_probability_reasoning_lengths.{ext}", bbox_inches="tight")
+plt.show()
+```
+
+## Uncertainty Score Distributions
+
+Boxplot of the normalised chosen-label probability (uncertainty score) distribution
+per model, aggregated across all datasets and prompts.  Five-number summary
+(min / Q25 / median / Q75 / max) is read directly from the pre-computed
+`norm_chosen` calibration metrics.
+
+```python
+# Collect five-number summary per model (aggregated across datasets × prompts).
+# Each model gets one box; whiskers = min/max, box = Q25–Q75, line = median.
+score_dist_data = {}   # model_id → {"min": ..., "q25": ..., "med": ..., "q75": ..., "max": ...}
+
+for model in models:
+    m_id = model["id"]
+    mins, q25s, meds, q75s, maxs = [], [], [], [], []
+    for prompt, dataset in product(prompt_designs, all_datasets):
+        pname, ds_id = prompt["basename"], dataset["id"]
+        entry = (cal_data[pname][ds_id][m_id] or {}).get("norm_chosen")
+        if entry is None:
+            continue
+        for key, lst in (("label_prob_min", mins), ("label_prob_q25", q25s),
+                         ("label_prob_median", meds), ("label_prob_q75", q75s),
+                         ("label_prob_max", maxs)):
+            v = entry.get(key)
+            if isinstance(v, (int, float)):
+                lst.append(v)
+    if meds:
+        score_dist_data[m_id] = {
+            "min":    np.min(mins),
+            "q25":    np.mean(q25s),
+            "median": np.mean(meds),
+            "q75":    np.mean(q75s),
+            "max":    np.max(maxs),
+            "model_type": model["type"],
+        }
+```
+
+```python
+apply_matplotlib_defaults()
+
+model_ids_ord = [m["id"] for m in models if m["id"] in score_dist_data]
+x = np.arange(len(model_ids_ord))
+fig, ax = plt.subplots(figsize=(max(12, len(model_ids_ord) * 1.2), 6))
+
+for i, m_id in enumerate(model_ids_ord):
+    d = score_dist_data[m_id]
+    mtype = d["model_type"]
+    cmap_name = {"instruct": "Blues", "base": "Oranges", "reasoning": "Greens"}.get(mtype, "Blues")
+    color = plt.cm.get_cmap(cmap_name)(0.55)
+
+    # Draw box (Q25–Q75) + median line + whiskers (min/max)
+    box_lo, box_hi = d["q25"], d["q75"]
+    med = d["median"]
+    whi_lo, whi_hi = d["min"], d["max"]
+    box_w = 0.4
+
+    # Whisker lines
+    ax.plot([i, i], [whi_lo, box_lo], color="black", linewidth=1)
+    ax.plot([i, i], [box_hi, whi_hi], color="black", linewidth=1)
+    # Whisker caps
+    ax.plot([i - box_w * 0.3, i + box_w * 0.3], [whi_lo, whi_lo], color="black", linewidth=1)
+    ax.plot([i - box_w * 0.3, i + box_w * 0.3], [whi_hi, whi_hi], color="black", linewidth=1)
+    # Box rectangle
+    rect = mpatches.FancyBboxPatch(
+        (i - box_w / 2, box_lo), box_w, box_hi - box_lo,
+        boxstyle="square,pad=0", facecolor=color, edgecolor="black", linewidth=1,
+    )
+    ax.add_patch(rect)
+    # Median line
+    ax.plot([i - box_w / 2, i + box_w / 2], [med, med], color="black", linewidth=2)
+
+ax.set_xticks(x)
+shortnames = [next(m["shortname"] for m in models if m["id"] == m_id) for m_id in model_ids_ord]
+ax.set_xticklabels(shortnames, rotation=45, ha="right", fontsize=12)
+ax.set_ylabel("Normalised Chosen-Label Probability", fontsize=14)
+ax.set_title(
+    "Uncertainty Score Distribution per Model\n"
+    "(min / Q25 / median / Q75 / max, averaged across datasets \u00d7 prompts)",
+    fontsize=14,
+)
+ax.set_ylim(0, 1)
+ax.set_yticks(np.arange(0.0, 1.1, 0.1))
+ax.grid(axis="y", linestyle="--", alpha=0.4)
+
+# Type legend
+legend_handles = [
+    mpatches.Patch(color=plt.cm.get_cmap("Blues")(0.55), label="Instruct"),
+    mpatches.Patch(color=plt.cm.get_cmap("Oranges")(0.55), label="Base"),
+    mpatches.Patch(color=plt.cm.get_cmap("Greens")(0.55), label="Reasoning"),
+]
+ax.legend(handles=legend_handles, fontsize=12)
+plt.tight_layout()
+plt.savefig(FIGURES_DIR / "uncertainty_score_distributions.svg", bbox_inches="tight")
+plt.savefig(FIGURES_DIR / "uncertainty_score_distributions.png", bbox_inches="tight")
+plt.show()
+```
+
+## Distance-to-1 Statistics
+
+Mean and std of `(1 \u2212 certainty)` per model \u2014 a proxy for how far the model\u2019s
+chosen-label confidence is from full certainty.  Computed here for verification;
+not yet plotted.
+
+```python
+# dist_to_1_data[model_id][prompt_basename] = (mean, std)
+# Averaged across all datasets for each (model, prompt) pair.
+dist_to_1_data = {}
+for model in models:
+    m_id = model["id"]
+    dist_to_1_data[m_id] = {}
+    for prompt in prompt_designs:
+        pname = prompt["basename"]
+        means, stds = [], []
+        for dataset in all_datasets:
+            entry = (cal_data[pname][dataset["id"]][m_id] or {}).get("norm_chosen")
+            if entry is None:
+                continue
+            m_val = entry.get("dist_to_1_mean")
+            s_val = entry.get("dist_to_1_std")
+            if isinstance(m_val, float) and isinstance(s_val, float):
+                means.append(m_val)
+                stds.append(s_val)
+        dist_to_1_data[m_id][pname] = (
+            float(np.mean(means)) if means else float("nan"),
+            float(np.mean(stds))  if stds  else float("nan"),
+        )
+
+# Quick verification printout
+print("Distance-to-1 stats (mean / std), norm_chosen, averaged across datasets:")
+print(f"{'Model':<50} {'Prompt':<20} {'mean(1-p)':>10} {'std(1-p)':>10}")
+print("-" * 95)
+for model in models:
+    m_id = model["id"]
+    for prompt in prompt_designs:
+        pname = prompt["basename"]
+        mean_d, std_d = dist_to_1_data[m_id][pname]
+        print(f"{m_id:<50} {pname:<20} {mean_d:>10.4f} {std_d:>10.4f}")
+```
+
+## Per-Dataset Uncertainty Score Distributions
+
+Combined figure: one row per dataset (MMLU, ARC Reasoning, GSM8K-MC, GPQA),
+shared x-axis.  Family rectangles span each row.  A dotted line connects the
+median values of base → instruct → reasoning models within each family.
+Legend: lower right, order base / instruct / reasoning.
+
+```python
+from util.models import model_families as _model_families
+from analysis_utils.plot_score_distributions import plot_score_distributions
+
+_dist_target_datasets = [
+    {"id": "MMLU",         "label": "MMLU"},
+    {"id": "ArcReasoning", "label": "ARC Reasoning"},
+    {"id": "GSM8KMC",      "label": "GSM8K-MC"},
+    {"id": "GPQA",         "label": "GPQA"},
+]
+
+apply_matplotlib_defaults()
+_fig_dist = plot_score_distributions(
+    cal_data=cal_data,
+    models=models,
+    model_families=_model_families,
+    prompt_designs=prompt_designs,
+    target_datasets=_dist_target_datasets,
+    figures_dir=FIGURES_DIR,
+)
+plt.show()
+```
+
+## Uncertainty Score ECDFs (per Model Type)
+
+Three figures (base / instruct / reasoning), each with one approximate ECDF
+line per model.  The ECDF is constructed from the five-number summary
+(min=0 %, Q25=25 %, median=50 %, Q75=75 %, max=100 %) averaged across all
+four target datasets.  Model shortnames are listed in the legend to the right.
+
+```python
+from analysis_utils.plot_score_ecdf import plot_score_ecdf
+
+apply_matplotlib_defaults()
+_ecdf_figs = plot_score_ecdf(
+    cal_data=cal_data,
+    models=models,
+    prompt_designs=prompt_designs,
+    target_datasets=_dist_target_datasets,
+    figures_dir=FIGURES_DIR,
+)
+for _mtype, _fig in _ecdf_figs:
+    print(f"ECDF – {_mtype}")
+    plt.show()
+    apply_matplotlib_defaults()
+```
+
+## Joint IQR Comparison (Model Type × Dataset)
+
+Single figure: for each dataset, three offset IQR markers (Q25–Q75 + median
+dot) coloured by model type.  Values are aggregated by averaging Q25 / median
+/ Q75 across all models of the same type per dataset.
+
+```python
+from analysis_utils.plot_score_iqr import plot_score_iqr
+
+apply_matplotlib_defaults()
+_fig_iqr = plot_score_iqr(
+    cal_data=cal_data,
+    models=models,
+    prompt_designs=prompt_designs,
+    target_datasets=_dist_target_datasets,
+    figures_dir=FIGURES_DIR,
+)
 plt.show()
 ```
