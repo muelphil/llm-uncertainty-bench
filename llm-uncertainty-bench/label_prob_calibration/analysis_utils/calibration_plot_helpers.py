@@ -148,16 +148,16 @@ def render_metrics_table(ax, data):
         table_rows.append(["ECE CI", f"[{ece_ci[0]:.4f}\u2013{ece_ci[1]:.4f}]"])
 
     # smECE row: read from the embedded relplot_diagram when available.
-    rp_diag = data.get("relplot_diagram")
-    if rp_diag is not None:
-        smece = rp_diag.get("ce")
-        ci_width = rp_diag.get("ce_ci_width")
-        if smece is not None:
-            if ci_width is not None:
-                smece_str = f"{float(smece):.4f} ± {float(ci_width):.4f}"
-            else:
-                smece_str = f"{float(smece):.4f}"
-            table_rows.append(["smECE", smece_str])
+    # rp_diag = data.get("relplot_diagram")
+    # if rp_diag is not None:
+    #     smece = rp_diag.get("ce")
+    #     ci_width = rp_diag.get("ce_ci_width")
+    #     if smece is not None:
+    #         if ci_width is not None:
+    #             smece_str = f"{float(smece):.4f} ± {float(ci_width):.4f}"
+    #         else:
+    #             smece_str = f"{float(smece):.4f}"
+    #         table_rows.append(["smECE", smece_str])
 
     table_rows += [
         ["AUROC", safe_format(data["auroc"])],
@@ -167,8 +167,8 @@ def render_metrics_table(ax, data):
         ["Accuracy", safe_format(data["accuracy"])],
         ["Median of Label Probabilities", safe_format(data["label_prob_median"])],
         ["IQR of Label Probabilities", safe_format(data["label_prob_iqr"])],
-        ["Median of Sum of Label Probabilities", safe_format(data["label_prob_sum_median"])],
-        ["IQR of Sum of Label Probabilities", safe_format(data["label_prob_sum_iqr"])],
+        # ["Median of Sum of Label Probabilities", safe_format(data["label_prob_sum_median"])],
+        # ["IQR of Sum of Label Probabilities", safe_format(data["label_prob_sum_iqr"])],
     ]
 
     table = ax.table(cellText=table_rows, loc="center", cellLoc="center")
@@ -275,7 +275,7 @@ def save_all_calibration_grids(prompt_designs, datasets, models, cal_data, figur
         for chosen_only, with_table, normalize in product([True, False], repeat=3):
             tag = (
                 f"cal_plot_prompt{prompt['idx']}"
-                f"_table{int(with_table)}"
+                f"_struct_dec_table{int(with_table)}"
                 f"_chosenonly{int(chosen_only)}"
                 f"_norm{int(normalize)}"
             )
@@ -286,27 +286,28 @@ def save_all_calibration_grids(prompt_designs, datasets, models, cal_data, figur
                     chosen_only=chosen_only, normalize=normalize,
                     with_table=with_table, with_title=True,
                     row_col_titles_font_size=26,
+                    ece_in_plot=True,
                 )
                 for ext in extensions:
                     plot.savefig(
-                        figures_dir / f"full_plots/{tag}_mmlu_physics.{ext}",
+                        figures_dir / f"full_plots/{tag}.{ext}",
                         bbox_inches="tight",
                     )
                 plt.close(plot)
                 # Relplot variant for all combinations.
-                rp_plot = build_calibration_grid(
-                    prompt, datasets, models, cal_data,
-                    chosen_only=chosen_only, normalize=normalize,
-                    with_table=with_table, with_title=True,
-                    subplot_fn=plot_relplot_subplot,
-                    row_col_titles_font_size=26,
-                )
-                for ext in extensions:
-                    rp_plot.savefig(
-                        figures_dir / f"full_plots/{tag}_mmlu_physics_relplot.{ext}",
-                        bbox_inches="tight",
-                    )
-                plt.close(rp_plot)
+                # rp_plot = build_calibration_grid(
+                #     prompt, datasets, models, cal_data,
+                #     chosen_only=chosen_only, normalize=normalize,
+                #     with_table=with_table, with_title=True,
+                #     subplot_fn=plot_relplot_subplot,
+                #     row_col_titles_font_size=26,
+                # )
+                # for ext in extensions:
+                #     rp_plot.savefig(
+                #         figures_dir / f"full_plots/{tag}_mmlu_physics_relplot.{ext}",
+                #         bbox_inches="tight",
+                #     )
+                # plt.close(rp_plot)
             except Exception as e:
                 print(f"  Failed: {e}")
 

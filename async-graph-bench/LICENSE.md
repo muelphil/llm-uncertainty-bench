@@ -1,4 +1,4 @@
-Copyright (c) 2023 Helmholtz-Zentrum Dresden-Rossendorf TODO
+Copyright (c) 2026 Helmholtz-Zentrum Dresden-Rossendorf
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the

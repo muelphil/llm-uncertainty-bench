@@ -1,0 +1,21 @@
+\begin{center}
+  \footnotesize
+  \centering
+  \makebox[\textwidth][c]{%
+    \begin{tabular}{l c c c c c c c c c c c c}
+      \toprule
+      Dataset & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-20b}} & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-120b}} & \parbox[t]{0mm}{\rotatebox{60}{Ministral-8B-Instruct-2410}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Nemo-Instruct-2407}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Small-3.2-24B-Instruct-2506}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-3.3-70B-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Llama-70B}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-4-Scout-17B-16E-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Instruct-2507}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Thinking-2507}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Qwen-32B}} & \parbox[t]{0mm}{\rotatebox{60}{gemma-3-27b-it}} \\
+      \midrule
+      MMLU & 0.2670 & 0.2692 & 0.9416 & 0.5994 & 0.8821 & 0.4078 & 0.8833 & 0.1968 & 0.3173 & 0.7538 & 0.4958 & 0.1326 \\
+      ARC Easy & 0.1487 & 0.1631 & 0.8976 & 0.6722 & 0.6685 & 0.1857 & 0.8702 & 0.0515 & 0.1061 & 0.7532 & 0.4666 & 0.0096 \\
+      ARC Challenge & 0.2209 & 0.2021 & 0.9139 & 0.6418 & 0.7321 & 0.2367 & 0.8787 & 0.0827 & 0.1266 & 0.7819 & 0.5730 & 0.0266 \\
+      SciQ & 0.1027 & 0.1278 & 0.8890 & 0.6650 & 0.7759 & 0.2018 & 0.8641 & 0.0698 & 0.0590 & 0.7616 & 0.5378 & 0.0100 \\
+      GPQA & 0.2665 & 0.2389 & 0.8901 & 0.5030 & 0.8384 & 0.5228 & 0.7815 & 0.3631 & 0.5508 & 0.9212 & 0.4812 & 0.3489 \\
+      GSM8K & 0.0650 & 0.0466 & 0.7550 & 0.3161 & 0.3895 & 0.0218 & 0.9342 & 0.0000 & 0.0259 & 0.3473 & 0.4314 & 0.1278 \\
+      SVamp & 0.0975 & 0.0839 & 0.8565 & 0.2644 & 0.4927 & 0.0553 & 0.8868 & 0.0243 & 0.0829 & 0.3573 & 0.3864 & 0.1935 \\
+      SciBench & 0.1869 & 0.1137 & 0.6387 & 0.8817 & 0.9491 & 0.3425 & 0.7588 & 0.1489 & 0.5588 & 0.5310 & 0.4587 & 0.4206 \\
+      \bottomrule
+    \end{tabular}%
+  }
+  \captionof{table}[Normalized Entropy of Bucket Counts by Model and Dataset for P(True)]{Normalized Entropy of Bucket Counts by Model and Dataset for P(True)}
+\end{center}

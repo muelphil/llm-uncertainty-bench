@@ -32,9 +32,10 @@ _mmlu_dataset["df"] = _mmlu_df
 _mmlu_physics_dataset = build_mmlu_physics_dataset(_mmlu_df)
 
 #: Ordered list of all datasets used in the experiment.
-all_datasets = [_mmlu_dataset, _mmlu_physics_dataset] + [
-    d for d in datasets if d["id"] != "MMLU"
-]
+all_datasets = datasets
+#[_mmlu_dataset, _mmlu_physics_dataset] + [
+#    d for d in datasets if d["id"] != "MMLU"
+#]
 for _ds in all_datasets:
     if "df" not in _ds:
         _ds["df"] = _ds["data_source"]().df

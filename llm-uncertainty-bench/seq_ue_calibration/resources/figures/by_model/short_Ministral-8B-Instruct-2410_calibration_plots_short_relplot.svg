@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1742.122296pt" height="860.51325pt" viewBox="0 0 1742.122296 860.51325" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-05-13T21:05:32.217337</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.6, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 860.51325 
+L 1742.122296 860.51325 
+L 1742.122296 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="matplotlib.axis_1"/>
+   <g id="matplotlib.axis_2"/>
+   <g id="text_1">
+    <text style="font-size: 14px; font-family: 'Times New Roman'; text-anchor: middle; fill: #555555" x="302.895122" y="256.916531" transform="rotate(-0 302.895122 256.916531)">No Data Available</text>
+   </g>
+   <g id="text_2">
+    <text style="font-weight: 700; font-size: 36px; font-family: 'Times New Roman'" transform="translate(31.03875 312.539813) rotate(-90)">MMLU</text>
+   </g>
+   <g id="text_3">
+    <text style="font-weight: 700; font-size: 36px; font-family: 'Times New Roman'; text-anchor: middle" x="302.895122" y="31.60125" transform="rotate(-0 302.895122 31.60125)">Verbalized Uncertainty</text>
+   </g>
+  </g>
+  <g id="axes_2">
+   <g id="matplotlib.axis_3"/>
+   <g id="matplotlib.axis_4"/>
+   <g id="text_4">
+    <text style="font-size: 14px; font-family: 'Times New Roman'; text-anchor: middle; fill: #555555" x="713.588601" y="256.916531" transform="rotate(-0 713.588601 256.916531)">No Data Available</text>
+   </g>
+   <g id="text_5">
+    <text style="font-weight: 700; font-size: 36px; font-family: 'Times New Roman'; text-anchor: middle" x="713.588601" y="31.60125" transform="rotate(-0 713.588601 31.60125)">P(True)</text>
+   </g>
+  </g>
+  <g id="axes_3">
+   <g id="matplotlib.axis_5"/>
+   <g id="matplotlib.axis_6"/>
+   <g id="text_6">
+    <text style="font-size: 14px; font-family: 'Times New Roman'; text-anchor: middle; fill: #555555" x="1124.282079" y="256.916531" transform="rotate(-0 1124.282079 256.916531)">No Data Available</text>
+   </g>
+   <g id="text_7">
+    <text style="font-weight: 700; font-size: 36px; font-family: 'Times New Roman'; text-anchor: middle" x="1124.282079" y="31.60125" transform="rotate(-0 1124.282079 31.60125)">Frequency of Answer</text>
+   </g>
+  </g>
+  <g id="axes_4">
+   <g id="matplotlib.axis_7"/>
+   <g id="matplotlib.axis_8"/>
+   <g id="text_8">
+    <text style="font-size: 14px; font-family: 'Times New Roman'; text-anchor: middle; fill: #555555" x="1534.975557" y="256.916531" transform="rotate(-0 1534.975557 256.916531)">No Data Available</text>
+   </g>
+   <g id="text_9">
+    <text style="font-weight: 700; font-size: 36px; font-family: 'Times New Roman'; text-anchor: middle" x="1534.975557" y="31.60125" transform="rotate(-0 1534.975557 31.60125)">CCP</text>
+   </g>
+  </g>
+  <g id="axes_5">
+   <g id="matplotlib.axis_9"/>
+   <g id="matplotlib.axis_10"/>
+   <g id="text_10">
+    <text style="font-size: 14px; font-family: 'Times New Roman'; text-anchor: middle; fill: #555555" x="302.895122" y="660.356531" transform="rotate(-0 302.895122 660.356531)">No Data Available</text>
+   </g>
+   <g id="text_11">
+    <text style="font-weight: 700; font-size: 36px; font-family: 'Times New Roman'" transform="translate(31.03875 720.9945) rotate(-90)">GSM8K</text>
+   </g>
+  </g>
+  <g id="axes_6">
+   <g id="matplotlib.axis_11"/>
+   <g id="matplotlib.axis_12"/>
+   <g id="text_12">
+    <text style="font-size: 14px; font-family: 'Times New Roman'; text-anchor: middle; fill: #555555" x="713.588601" y="660.356531" transform="rotate(-0 713.588601 660.356531)">No Data Available</text>
+   </g>
+  </g>
+  <g id="axes_7">
+   <g id="matplotlib.axis_13"/>
+   <g id="matplotlib.axis_14"/>
+   <g id="text_13">
+    <text style="font-size: 14px; font-family: 'Times New Roman'; text-anchor: middle; fill: #555555" x="1124.282079" y="660.356531" transform="rotate(-0 1124.282079 660.356531)">No Data Available</text>
+   </g>
+  </g>
+  <g id="axes_8">
+   <g id="matplotlib.axis_15"/>
+   <g id="matplotlib.axis_16"/>
+   <g id="text_14">
+    <text style="font-size: 14px; font-family: 'Times New Roman'; text-anchor: middle; fill: #555555" x="1534.975557" y="660.356531" transform="rotate(-0 1534.975557 660.356531)">No Data Available</text>
+   </g>
+  </g>
+ </g>
+</svg>

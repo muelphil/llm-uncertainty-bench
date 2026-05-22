@@ -15,7 +15,7 @@ from util.models import MODELS
 models = [
     m
     for m in MODELS
-    if m["type"] in ["instruct", "reasoning"]# and "Magistral" not in m["name"]
+    if m["type"] in ["instruct", "reasoning"] and "Magistral" not in m["name"]
 ]
 
 uq_methods = [

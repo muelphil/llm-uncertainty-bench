@@ -203,14 +203,20 @@ def compute_calibration_metrics(ground_truth_df, label_prob_df,
 
     if certainties:
         metrics["label_prob_median"] = np.median(certainties)
-        metrics["label_prob_iqr"] = (
-            np.percentile(certainties, 75) - np.percentile(certainties, 25)
-        )
+        metrics["label_prob_q25"] = float(np.percentile(certainties, 25))
+        metrics["label_prob_q75"] = float(np.percentile(certainties, 75))
+        metrics["label_prob_iqr"] = metrics["label_prob_q75"] - metrics["label_prob_q25"]
+        metrics["label_prob_min"] = float(np.min(certainties))
+        metrics["label_prob_max"] = float(np.max(certainties))
         metrics["average_certainty"] = np.mean(certainties)
+        dist = 1.0 - np.array(certainties)
+        metrics["dist_to_1_mean"] = float(np.mean(dist))
+        metrics["dist_to_1_std"] = float(np.std(dist))
     else:
-        metrics["label_prob_median"] = "undefined"
-        metrics["label_prob_iqr"] = "undefined"
-        metrics["average_certainty"] = "undefined"
+        for key in ("label_prob_median", "label_prob_q25", "label_prob_q75",
+                    "label_prob_iqr", "label_prob_min", "label_prob_max",
+                    "average_certainty", "dist_to_1_mean", "dist_to_1_std"):
+            metrics[key] = "undefined"
 
     if return_arrays:
         return metrics, correct, certainties
@@ -292,14 +298,20 @@ def _compute_metrics_from_arrays(correct_arr, certainties_arr, label_prob_df, n_
 
     if len(certainties_list) > 0:
         metrics["label_prob_median"] = float(np.median(certainties_arr))
-        metrics["label_prob_iqr"] = float(
-            np.percentile(certainties_arr, 75) - np.percentile(certainties_arr, 25)
-        )
+        metrics["label_prob_q25"] = float(np.percentile(certainties_arr, 25))
+        metrics["label_prob_q75"] = float(np.percentile(certainties_arr, 75))
+        metrics["label_prob_iqr"] = metrics["label_prob_q75"] - metrics["label_prob_q25"]
+        metrics["label_prob_min"] = float(np.min(certainties_arr))
+        metrics["label_prob_max"] = float(np.max(certainties_arr))
         metrics["average_certainty"] = float(np.mean(certainties_arr))
+        dist = 1.0 - certainties_arr
+        metrics["dist_to_1_mean"] = float(np.mean(dist))
+        metrics["dist_to_1_std"] = float(np.std(dist))
     else:
-        metrics["label_prob_median"] = "undefined"
-        metrics["label_prob_iqr"] = "undefined"
-        metrics["average_certainty"] = "undefined"
+        for key in ("label_prob_median", "label_prob_q25", "label_prob_q75",
+                    "label_prob_iqr", "label_prob_min", "label_prob_max",
+                    "average_certainty", "dist_to_1_mean", "dist_to_1_std"):
+            metrics[key] = "undefined"
 
     return metrics
 

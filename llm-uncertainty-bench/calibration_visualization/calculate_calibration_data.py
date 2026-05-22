@@ -1,6 +1,39 @@
 import numpy as np
 
 
+def calculate_calibration_correlation(bin_confidences, bucket_accuracies, bucket_counts):
+    """Compute Pearson correlation between bin confidence midpoints and bucket accuracies.
+
+    Measures how well accuracy tracks confidence across bins — a perfectly
+    calibrated model achieves r = 1.0.  Unlike ECE, each non-empty bucket
+    contributes equally regardless of how many items it contains.
+
+    Args:
+        bin_confidences (array-like): Centre confidence value of each bin.
+        bucket_accuracies (array-like): Mean accuracy of items in each bin
+            (value is irrelevant for empty bins — they are ignored).
+        bucket_counts (array-like): Number of items in each bin; bins with
+            count == 0 are excluded from the correlation.
+
+    Returns:
+        float: Pearson r in [-1, 1].  Returns ``float("nan")`` when fewer than
+        two non-empty bins exist (correlation undefined).
+    """
+    bin_confidences  = np.asarray(bin_confidences,  dtype=float)
+    bucket_accuracies = np.asarray(bucket_accuracies, dtype=float)
+    bucket_counts    = np.asarray(bucket_counts,     dtype=int)
+
+    mask = bucket_counts > 0
+    x = bin_confidences[mask]
+    y = bucket_accuracies[mask]
+
+    if len(x) < 2:
+        return float("nan")
+
+    r = np.corrcoef(x, y)[0, 1]
+    return float(r)
+
+
 def _bootstrap_ci(correct, certainty, bin_fn, n_bootstrap, confidence):
     """Compute bootstrap confidence intervals for bucket accuracies and ECE.
 

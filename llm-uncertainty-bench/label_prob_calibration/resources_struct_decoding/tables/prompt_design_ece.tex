@@ -1,0 +1,98 @@
+
+\begin{table}[h]
+    \centering
+    \makebox[\textwidth][c]{%
+    \begin{tabular}{l|lcccc|cc}
+        \toprule
+        Dataset & Model & Prompt 1 & Prompt 2 & Prompt 3 & Prompt 4 & Mean & max-min \\
+        \midrule
+        \multirow{20}{*}{MMLU} & gpt-oss-20b & 0.1691 & 0.1691 & 0.0000 \\
+        & gpt-oss-120b & 0.1053 & 0.1053 & 0.0000 \\
+        & Ministral-8B-Instruct-2410 & 0.0575 & 0.0575 & 0.0000 \\
+        & Mistral-Nemo-Base-2407 & 0.0473 & 0.0473 & 0.0000 \\
+        & Mistral-Nemo-Instruct-2407 & 0.1681 & 0.1681 & 0.0000 \\
+        & Mistral-Small-3.1-24B-Base-2503 & 0.0940 & 0.0940 & 0.0000 \\
+        & Mistral-Small-3.2-24B-Instruct-2506 & 0.1026 & 0.1026 & 0.0000 \\
+        & Magistral-Small-2507 & 0.0613 & 0.0613 & 0.0000 \\
+        & Magistral-Small-2507-Reasoning-Enabled & 0.0874 & 0.0874 & 0.0000 \\
+        & Llama-3.1-70B & 0.0660 & 0.0660 & 0.0000 \\
+        & Llama-3.3-70B-Instruct & 0.1548 & 0.1548 & 0.0000 \\
+        & DeepSeek-R1-Distill-Llama-70B & 0.0752 & 0.0752 & 0.0000 \\
+        & Llama-4-Scout-17B-16E & 0.1093 & 0.1093 & 0.0000 \\
+        & Llama-4-Scout-17B-16E-Instruct & 0.1749 & 0.1749 & 0.0000 \\
+        & Qwen3-30B-A3B-Base & 0.0408 & 0.0408 & 0.0000 \\
+        & Qwen3-30B-A3B-Instruct-2507 & 0.1469 & 0.1469 & 0.0000 \\
+        & Qwen3-30B-A3B-Thinking-2507 & 0.0313 & 0.0313 & 0.0000 \\
+        & DeepSeek-R1-Distill-Qwen-32B & 0.0462 & 0.0462 & 0.0000 \\
+        & gemma-3-27b-pt & 0.0227 & 0.0227 & 0.0000 \\
+        & gemma-3-27b-it & 0.2081 & 0.2081 & 0.0000 \\
+        \midrule
+        \multirow{20}{*}{ArcReasoning} & gpt-oss-20b & 0.0003 & 0.0003 & 0.0000 \\
+        & gpt-oss-120b & 0.0152 & 0.0152 & 0.0000 \\
+        & Ministral-8B-Instruct-2410 & 0.0796 & 0.0796 & 0.0000 \\
+        & Mistral-Nemo-Base-2407 & 0.1514 & 0.1514 & 0.0000 \\
+        & Mistral-Nemo-Instruct-2407 & 0.0231 & 0.0231 & 0.0000 \\
+        & Mistral-Small-3.1-24B-Base-2503 & 0.1848 & 0.1848 & 0.0000 \\
+        & Mistral-Small-3.2-24B-Instruct-2506 & 0.0266 & 0.0266 & 0.0000 \\
+        & Magistral-Small-2507 & 0.0370 & 0.0370 & 0.0000 \\
+        & Magistral-Small-2507-Reasoning-Enabled & 0.0265 & 0.0265 & 0.0000 \\
+        & Llama-3.1-70B & 0.1464 & 0.1464 & 0.0000 \\
+        & Llama-3.3-70B-Instruct & 0.0068 & 0.0068 & 0.0000 \\
+        & DeepSeek-R1-Distill-Llama-70B & 0.0697 & 0.0697 & 0.0000 \\
+        & Llama-4-Scout-17B-16E & 0.0291 & 0.0291 & 0.0000 \\
+        & Llama-4-Scout-17B-16E-Instruct & 0.0052 & 0.0052 & 0.0000 \\
+        & Qwen3-30B-A3B-Base & 0.0799 & 0.0799 & 0.0000 \\
+        & Qwen3-30B-A3B-Instruct-2507 & 0.0206 & 0.0206 & 0.0000 \\
+        & Qwen3-30B-A3B-Thinking-2507 & 0.1239 & 0.1239 & 0.0000 \\
+        & DeepSeek-R1-Distill-Qwen-32B & 0.0514 & 0.0514 & 0.0000 \\
+        & gemma-3-27b-pt & 0.1447 & 0.1447 & 0.0000 \\
+        & gemma-3-27b-it & 0.0035 & 0.0035 & 0.0000 \\
+        \midrule
+        \multirow{20}{*}{GSM8KMC} & gpt-oss-20b & 0.0234 & 0.0234 & 0.0000 \\
+        & gpt-oss-120b & 0.0268 & 0.0268 & 0.0000 \\
+        & Ministral-8B-Instruct-2410 & 0.0488 & 0.0488 & 0.0000 \\
+        & Mistral-Nemo-Base-2407 & 0.1485 & 0.1485 & 0.0000 \\
+        & Mistral-Nemo-Instruct-2407 & 0.1557 & 0.1557 & 0.0000 \\
+        & Mistral-Small-3.1-24B-Base-2503 & 0.0524 & 0.0524 & 0.0000 \\
+        & Mistral-Small-3.2-24B-Instruct-2506 & 0.0637 & 0.0637 & 0.0000 \\
+        & Magistral-Small-2507 & 0.0221 & 0.0221 & 0.0000 \\
+        & Magistral-Small-2507-Reasoning-Enabled & 0.0327 & 0.0327 & 0.0000 \\
+        & Llama-3.1-70B & 0.0207 & 0.0207 & 0.0000 \\
+        & Llama-3.3-70B-Instruct & 0.3001 & 0.3001 & 0.0000 \\
+        & DeepSeek-R1-Distill-Llama-70B & 0.0760 & 0.0760 & 0.0000 \\
+        & Llama-4-Scout-17B-16E & 0.1553 & 0.1553 & 0.0000 \\
+        & Llama-4-Scout-17B-16E-Instruct & 0.3711 & 0.3711 & 0.0000 \\
+        & Qwen3-30B-A3B-Base & 0.0418 & 0.0418 & 0.0000 \\
+        & Qwen3-30B-A3B-Instruct-2507 & 0.1829 & 0.1829 & 0.0000 \\
+        & Qwen3-30B-A3B-Thinking-2507 & 0.0363 & 0.0363 & 0.0000 \\
+        & DeepSeek-R1-Distill-Qwen-32B & 0.2025 & 0.2025 & 0.0000 \\
+        & gemma-3-27b-pt & 0.1408 & 0.1408 & 0.0000 \\
+        & gemma-3-27b-it & 0.2908 & 0.2908 & 0.0000 \\
+        \midrule
+        \multirow{20}{*}{GPQA} & gpt-oss-20b & 0.3092 & 0.3092 & 0.0000 \\
+        & gpt-oss-120b & 0.3037 & 0.3037 & 0.0000 \\
+        & Ministral-8B-Instruct-2410 & 0.1211 & 0.1211 & 0.0000 \\
+        & Mistral-Nemo-Base-2407 & 0.1976 & 0.1976 & 0.0000 \\
+        & Mistral-Nemo-Instruct-2407 & 0.2304 & 0.2304 & 0.0000 \\
+        & Mistral-Small-3.1-24B-Base-2503 & 0.1225 & 0.1225 & 0.0000 \\
+        & Mistral-Small-3.2-24B-Instruct-2506 & 0.2278 & 0.2278 & 0.0000 \\
+        & Magistral-Small-2507 & 0.1277 & 0.1277 & 0.0000 \\
+        & Magistral-Small-2507-Reasoning-Enabled & 0.4031 & 0.4031 & 0.0000 \\
+        & Llama-3.1-70B & 0.1789 & 0.1789 & 0.0000 \\
+        & Llama-3.3-70B-Instruct & 0.4650 & 0.4650 & 0.0000 \\
+        & DeepSeek-R1-Distill-Llama-70B & 0.1437 & 0.1437 & 0.0000 \\
+        & Llama-4-Scout-17B-16E & 0.2092 & 0.2092 & 0.0000 \\
+        & Llama-4-Scout-17B-16E-Instruct & 0.5342 & 0.5342 & 0.0000 \\
+        & Qwen3-30B-A3B-Base & 0.1659 & 0.1659 & 0.0000 \\
+        & Qwen3-30B-A3B-Instruct-2507 & 0.3673 & 0.3673 & 0.0000 \\
+        & Qwen3-30B-A3B-Thinking-2507 & 0.1693 & 0.1693 & 0.0000 \\
+        & DeepSeek-R1-Distill-Qwen-32B & 0.2268 & 0.2268 & 0.0000 \\
+        & gemma-3-27b-pt & 0.2643 & 0.2643 & 0.0000 \\
+        & gemma-3-27b-it & 0.5799 & 0.5799 & 0.0000 \\
+        \midrule
+        \bottomrule
+    \end{tabular}
+    }
+    \caption{ECE Across Prompts (using Probability of chosen Labels only) with Mean and Deviation for each Dataset. Dataset-level statistics: MMLU: $\mu_{dev}$=0.0000, $\sigma_{dev}$=0.0000, $\mu_{mean}$=0.0984 ArcReasoning: $\mu_{dev}$=0.0000, $\sigma_{dev}$=0.0000, $\mu_{mean}$=0.0613 GSM8KMC: $\mu_{dev}$=0.0000, $\sigma_{dev}$=0.0000, $\mu_{mean}$=0.1196 GPQA: $\mu_{dev}$=0.0000, $\sigma_{dev}$=0.0000, $\mu_{mean}$=0.2674. }
+    \label{tab:ece}
+\end{table}

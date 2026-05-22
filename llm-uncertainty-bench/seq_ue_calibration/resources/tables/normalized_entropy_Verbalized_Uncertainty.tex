@@ -1,0 +1,21 @@
+\begin{center}
+  \footnotesize
+  \centering
+  \makebox[\textwidth][c]{%
+    \begin{tabular}{l c c c c c c c c c c c c}
+      \toprule
+      Dataset & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-20b}} & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-120b}} & \parbox[t]{0mm}{\rotatebox{60}{Ministral-8B-Instruct-2410}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Nemo-Instruct-2407}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Small-3.2-24B-Instruct-2506}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-3.3-70B-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Llama-70B}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-4-Scout-17B-16E-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Instruct-2507}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Thinking-2507}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Qwen-32B}} & \parbox[t]{0mm}{\rotatebox{60}{gemma-3-27b-it}} \\
+      \midrule
+      MMLU & 0.1117 & 0.2924 & 0.5431 & 0.5181 & 0.3442 & 0.4640 & 0.3922 & 0.2332 & 0.1089 & 0.0653 & 0.4713 & 0.4509 \\
+      ARC Easy & 0.1425 & 0.2661 & 0.5864 & 0.5693 & 0.4050 & 0.5265 & 0.4118 & 0.3094 & 0.1249 & 0.0384 & 0.5538 & 0.5558 \\
+      ARC Challenge & 0.1966 & 0.3847 & 0.6282 & 0.6155 & 0.4830 & 0.5607 & 0.4669 & 0.3926 & 0.1548 & 0.0476 & 0.6201 & 0.5959 \\
+      SciQ & 0.1000 & 0.2497 & 0.5255 & 0.4738 & 0.4086 & 0.5108 & 0.3757 & 0.2254 & 0.0955 & 0.0542 & 0.5101 & 0.5404 \\
+      GPQA & 0.7166 & 0.7491 & 0.7200 & 0.7187 & 0.6587 & 0.6601 & 0.5667 & 0.5301 & 0.3910 & 0.2502 & 0.7603 & 0.6569 \\
+      GSM8K & 0.1896 & 0.3231 & 0.1372 & 0.1969 & 0.0484 & 0.0085 & 0.1752 & 0.0373 & 0.3379 & 0.0255 & 0.2517 & 0.0267 \\
+      SVamp & 0.2147 & 0.2863 & 0.0907 & 0.1873 & 0.0947 & 0.0551 & 0.1598 & 0.0701 & 0.4255 & 0.0378 & 0.2165 & 0.0690 \\
+      SciBench & 0.4544 & 0.6891 & 0.4847 & 0.4068 & 0.2298 & 0.1737 & 0.3689 & 0.3719 & 0.3492 & 0.0281 & 0.4048 & 0.3817 \\
+      \bottomrule
+    \end{tabular}%
+  }
+  \captionof{table}[Normalized Entropy of Bucket Counts by Model and Dataset for Verbalized Uncertainty]{Normalized Entropy of Bucket Counts by Model and Dataset for Verbalized Uncertainty}
+\end{center}

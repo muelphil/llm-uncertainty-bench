@@ -141,7 +141,7 @@ def plot_calibration_curve(bin_confidences, bucket_accuracies, bucket_counts, co
         ax.text(0.02, 0.98, f"ECE:{ece:.4f}", transform=ax.transAxes, fontsize=16,
                 verticalalignment='top', horizontalalignment='left', color="black")
         if ece_ci is not None:
-            ax.text(0.02, 0.91, f"[CI:{ece_ci[0]:.4f}\u2013{ece_ci[1]:.4f}]",
+            ax.text(0.02, 0.93, f"[CI:{ece_ci[0]:.4f}\u2013{ece_ci[1]:.4f}]",
                     transform=ax.transAxes, fontsize=9,
                     verticalalignment='top', horizontalalignment='left', color="black")
 

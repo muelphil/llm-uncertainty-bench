@@ -1,0 +1,41 @@
+\begin{table}[ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{l c c c c c c c c}
+\toprule
+\textbf{Model} & \rotatebox{45}{\textbf{MMLU}} & \rotatebox{45}{\textbf{ARC\_Easy}} & \rotatebox{45}{\textbf{ARC\_Challenge}} & \rotatebox{45}{\textbf{SciQ}} & \rotatebox{45}{\textbf{GPQA}} & \rotatebox{45}{\textbf{GSM8K}} & \rotatebox{45}{\textbf{SVamp}} & \rotatebox{45}{\textbf{SciBench}} \\
+\midrule
+gpt-oss-20b & \shortstack[c]{1046 \\{\scriptsize \textcolor{gray}{$\pm$ 431}}} & \shortstack[c]{844 \\{\scriptsize \textcolor{gray}{$\pm$ 283}}} & \shortstack[c]{851 \\{\scriptsize \textcolor{gray}{$\pm$ 305}}} & \shortstack[c]{838 \\{\scriptsize \textcolor{gray}{$\pm$ 273}}} & \shortstack[c]{2838 \\{\scriptsize \textcolor{gray}{$\pm$ 2274}}} & \shortstack[c]{475 \\{\scriptsize \textcolor{gray}{$\pm$ 433}}} & \shortstack[c]{309 \\{\scriptsize \textcolor{gray}{$\pm$ 287}}} & \shortstack[c]{2253 \\{\scriptsize \textcolor{gray}{$\pm$ 2270}}} \\
+\midrule
+gpt-oss-120b & \shortstack[c]{872 \\{\scriptsize \textcolor{gray}{$\pm$ 323}}} & \shortstack[c]{695 \\{\scriptsize \textcolor{gray}{$\pm$ 305}}} & \shortstack[c]{676 \\{\scriptsize \textcolor{gray}{$\pm$ 313}}} & \shortstack[c]{641 \\{\scriptsize \textcolor{gray}{$\pm$ 257}}} & \shortstack[c]{1754 \\{\scriptsize \textcolor{gray}{$\pm$ 1226}}} & \shortstack[c]{347 \\{\scriptsize \textcolor{gray}{$\pm$ 205}}} & \shortstack[c]{239 \\{\scriptsize \textcolor{gray}{$\pm$ 182}}} & \shortstack[c]{1320 \\{\scriptsize \textcolor{gray}{$\pm$ 964}}} \\
+\midrule
+Ministral-8B & \shortstack[c]{433 \\{\scriptsize \textcolor{gray}{$\pm$ 173}}} & \shortstack[c]{323 \\{\scriptsize \textcolor{gray}{$\pm$ 102}}} & \shortstack[c]{340 \\{\scriptsize \textcolor{gray}{$\pm$ 111}}} & \shortstack[c]{303 \\{\scriptsize \textcolor{gray}{$\pm$ 98}}} & \shortstack[c]{632 \\{\scriptsize \textcolor{gray}{$\pm$ 196}}} & \shortstack[c]{225 \\{\scriptsize \textcolor{gray}{$\pm$ 91}}} & \shortstack[c]{127 \\{\scriptsize \textcolor{gray}{$\pm$ 128}}} & \shortstack[c]{713 \\{\scriptsize \textcolor{gray}{$\pm$ 234}}} \\
+\midrule
+Mistral-Nemo-7B & \shortstack[c]{346 \\{\scriptsize \textcolor{gray}{$\pm$ 148}}} & \shortstack[c]{279 \\{\scriptsize \textcolor{gray}{$\pm$ 78}}} & \shortstack[c]{285 \\{\scriptsize \textcolor{gray}{$\pm$ 84}}} & \shortstack[c]{248 \\{\scriptsize \textcolor{gray}{$\pm$ 72}}} & \shortstack[c]{515 \\{\scriptsize \textcolor{gray}{$\pm$ 202}}} & \shortstack[c]{226 \\{\scriptsize \textcolor{gray}{$\pm$ 84}}} & \shortstack[c]{134 \\{\scriptsize \textcolor{gray}{$\pm$ 106}}} & \shortstack[c]{533 \\{\scriptsize \textcolor{gray}{$\pm$ 281}}} \\
+\midrule
+Mistral-Small-3.2-24B & \shortstack[c]{681 \\{\scriptsize \textcolor{gray}{$\pm$ 444}}} & \shortstack[c]{471 \\{\scriptsize \textcolor{gray}{$\pm$ 130}}} & \shortstack[c]{498 \\{\scriptsize \textcolor{gray}{$\pm$ 169}}} & \shortstack[c]{458 \\{\scriptsize \textcolor{gray}{$\pm$ 131}}} & \shortstack[c]{1337 \\{\scriptsize \textcolor{gray}{$\pm$ 904}}} & \shortstack[c]{435 \\{\scriptsize \textcolor{gray}{$\pm$ 352}}} & \shortstack[c]{284 \\{\scriptsize \textcolor{gray}{$\pm$ 276}}} & \shortstack[c]{1330 \\{\scriptsize \textcolor{gray}{$\pm$ 1033}}} \\
+\midrule
+Llama-3.3-70B & \shortstack[c]{484 \\{\scriptsize \textcolor{gray}{$\pm$ 324}}} & \shortstack[c]{365 \\{\scriptsize \textcolor{gray}{$\pm$ 83}}} & \shortstack[c]{380 \\{\scriptsize \textcolor{gray}{$\pm$ 93}}} & \shortstack[c]{357 \\{\scriptsize \textcolor{gray}{$\pm$ 77}}} & \shortstack[c]{949 \\{\scriptsize \textcolor{gray}{$\pm$ 536}}} & \shortstack[c]{244 \\{\scriptsize \textcolor{gray}{$\pm$ 74}}} & \shortstack[c]{198 \\{\scriptsize \textcolor{gray}{$\pm$ 291}}} & \shortstack[c]{765 \\{\scriptsize \textcolor{gray}{$\pm$ 384}}} \\
+\midrule
+DeepSeek-Llama-70B & \shortstack[c]{1290 \\{\scriptsize \textcolor{gray}{$\pm$ 1356}}} & \shortstack[c]{583 \\{\scriptsize \textcolor{gray}{$\pm$ 253}}} & \shortstack[c]{622 \\{\scriptsize \textcolor{gray}{$\pm$ 267}}} & \shortstack[c]{548 \\{\scriptsize \textcolor{gray}{$\pm$ 193}}} & \shortstack[c]{4300 \\{\scriptsize \textcolor{gray}{$\pm$ 2928}}} & \shortstack[c]{597 \\{\scriptsize \textcolor{gray}{$\pm$ 537}}} & \shortstack[c]{331 \\{\scriptsize \textcolor{gray}{$\pm$ 207}}} & \shortstack[c]{4658 \\{\scriptsize \textcolor{gray}{$\pm$ 3398}}} \\
+\midrule
+Llama-4-Scout-17B & \shortstack[c]{453 \\{\scriptsize \textcolor{gray}{$\pm$ 144}}} & \shortstack[c]{397 \\{\scriptsize \textcolor{gray}{$\pm$ 88}}} & \shortstack[c]{413 \\{\scriptsize \textcolor{gray}{$\pm$ 96}}} & \shortstack[c]{385 \\{\scriptsize \textcolor{gray}{$\pm$ 78}}} & \shortstack[c]{749 \\{\scriptsize \textcolor{gray}{$\pm$ 233}}} & \shortstack[c]{231 \\{\scriptsize \textcolor{gray}{$\pm$ 69}}} & \shortstack[c]{202 \\{\scriptsize \textcolor{gray}{$\pm$ 269}}} & \shortstack[c]{771 \\{\scriptsize \textcolor{gray}{$\pm$ 383}}} \\
+\midrule
+Qwen3-30B-A3B-Instruct & \shortstack[c]{675 \\{\scriptsize \textcolor{gray}{$\pm$ 432}}} & \shortstack[c]{456 \\{\scriptsize \textcolor{gray}{$\pm$ 140}}} & \shortstack[c]{492 \\{\scriptsize \textcolor{gray}{$\pm$ 168}}} & \shortstack[c]{456 \\{\scriptsize \textcolor{gray}{$\pm$ 197}}} & \shortstack[c]{2824 \\{\scriptsize \textcolor{gray}{$\pm$ 1302}}} & \shortstack[c]{305 \\{\scriptsize \textcolor{gray}{$\pm$ 303}}} & \shortstack[c]{311 \\{\scriptsize \textcolor{gray}{$\pm$ 591}}} & \shortstack[c]{2139 \\{\scriptsize \textcolor{gray}{$\pm$ 1484}}} \\
+\midrule
+Qwen3-30B-A3B-Thinking & \shortstack[c]{1887 \\{\scriptsize \textcolor{gray}{$\pm$ 1202}}} & \shortstack[c]{1485 \\{\scriptsize \textcolor{gray}{$\pm$ 632}}} & \shortstack[c]{1558 \\{\scriptsize \textcolor{gray}{$\pm$ 692}}} & \shortstack[c]{1496 \\{\scriptsize \textcolor{gray}{$\pm$ 692}}} & \shortstack[c]{6827 \\{\scriptsize \textcolor{gray}{$\pm$ 3213}}} & \shortstack[c]{1095 \\{\scriptsize \textcolor{gray}{$\pm$ 701}}} & \shortstack[c]{801 \\{\scriptsize \textcolor{gray}{$\pm$ 695}}} & \shortstack[c]{6230 \\{\scriptsize \textcolor{gray}{$\pm$ 3252}}} \\
+\midrule
+DeepSeek-Qwen-32B & \shortstack[c]{1457 \\{\scriptsize \textcolor{gray}{$\pm$ 1605}}} & \shortstack[c]{649 \\{\scriptsize \textcolor{gray}{$\pm$ 274}}} & \shortstack[c]{691 \\{\scriptsize \textcolor{gray}{$\pm$ 310}}} & \shortstack[c]{625 \\{\scriptsize \textcolor{gray}{$\pm$ 253}}} & \shortstack[c]{5251 \\{\scriptsize \textcolor{gray}{$\pm$ 3322}}} & \shortstack[c]{537 \\{\scriptsize \textcolor{gray}{$\pm$ 439}}} & \shortstack[c]{313 \\{\scriptsize \textcolor{gray}{$\pm$ 120}}} & \shortstack[c]{5966 \\{\scriptsize \textcolor{gray}{$\pm$ 3267}}} \\
+\midrule
+google/gemma-3-27b & \shortstack[c]{426 \\{\scriptsize \textcolor{gray}{$\pm$ 184}}} & \shortstack[c]{287 \\{\scriptsize \textcolor{gray}{$\pm$ 106}}} & \shortstack[c]{299 \\{\scriptsize \textcolor{gray}{$\pm$ 107}}} & \shortstack[c]{280 \\{\scriptsize \textcolor{gray}{$\pm$ 100}}} & \shortstack[c]{856 \\{\scriptsize \textcolor{gray}{$\pm$ 345}}} & \shortstack[c]{248 \\{\scriptsize \textcolor{gray}{$\pm$ 157}}} & \shortstack[c]{180 \\{\scriptsize \textcolor{gray}{$\pm$ 187}}} & \shortstack[c]{951 \\{\scriptsize \textcolor{gray}{$\pm$ 523}}} \\
+\midrule
+\midrule
+Averaged Mean (Instruct) & 500 & 368 & 387 & 355 & 1123 & 273 & 205 & 1029 \\
+Averaged Mean (Reasoning) & 1310 & 851 & 880 & 830 & 4194 & 610 & 398 & 4086 \\
+Averaged Mean (Total) & 838 & 569 & 592 & 553 & 2403 & 414 & 286 & 2302 \\
+\bottomrule
+\end{tabular}
+\caption{Combined (Answer + Reasoning) Token Length by Model and Dataset}
+\end{table}

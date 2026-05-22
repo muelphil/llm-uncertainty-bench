@@ -118,13 +118,13 @@ MODELS = [
                    "config_format": "mistral", "gpu_memory_utilization": 0.90},
         "kwargs_a100": {"tensor_parallel_size": 2},
         "kwargs_h100": {"tensor_parallel_size": 1},
-        "type": "reasoning",
+        "type": "instruct",
         "reasoning_parser": "mistral",
         "yes_no_ids": [13830, 3501],
     },
     {
-        "name": "mistralai/Magistral-Small-2507",
-        "basename": "Magistral-Small-2507",  # <===============
+        "name": "mistralai/Magistral-Small-2507-Reasoning-Enabled",
+        "basename": "Magistral-Small-2507-Reasoning-Enabled",  # <===============
         "shortname": "Magistral-Small-24B-Reasoning",  # <===============
         "kwargs": {"tokenizer_mode": "mistral", "load_format": "mistral", "reasoning_parser": "mistral",
                    "config_format": "mistral", "gpu_memory_utilization": 0.90},
@@ -281,45 +281,63 @@ MODELS = [
 
 model_families = [
     # Mistral Nemo
-    [
-        "mistralai/Mistral-Nemo-Base-2407",
-        "mistralai/Mistral-Nemo-Instruct-2407",
-    ],
+    {
+        "name": "Mistral Nemo",
+        "models": [
+            "mistralai/Mistral-Nemo-Base-2407",
+            "mistralai/Mistral-Nemo-Instruct-2407",
+        ],
+    },
 
     # Mistral Small / Magistral
     # Magistral-Small is a reasoning-tuned descendant of Mistral-Small
-    [
-        "mistralai/Mistral-Small-3.1-24B-Base-2503",
-        "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
-        "mistralai/Magistral-Small-2507",
-    ],
+    {
+        "name": "Mistral Small / Magistral",
+        "models": [
+            "mistralai/Mistral-Small-3.1-24B-Base-2503",
+            "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+            "mistralai/Magistral-Small-2507-Reasoning-Enabled",
+        ],
+    },
 
     # Llama 3.x + DeepSeek distill
     # DeepSeek-R1-Distill-Llama-70B is distilled from DeepSeek-R1 onto Llama-3.x-Instruct
-    [
-        "meta-llama/Llama-3.1-70B",
-        "meta-llama/Llama-3.3-70B-Instruct",
-        "deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
-    ],
+    {
+        "name": "Llama 3 + DeepSeek-Distill",
+        "models": [
+            "meta-llama/Llama-3.1-70B",
+            "meta-llama/Llama-3.3-70B-Instruct",
+            "deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
+        ],
+    },
 
     # Llama 4 Scout
-    [
-        "meta-llama/Llama-4-Scout-17B-16E",
-        "meta-llama/Llama-4-Scout-17B-16E-Instruct",
-    ],
+    {
+        "name": "Llama 4 Scout",
+        "models": [
+            "meta-llama/Llama-4-Scout-17B-16E",
+            "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+        ],
+    },
 
     # Qwen3 Thinking family
-    [
-        "Qwen/Qwen3-30B-A3B-Base",
-        "Qwen/Qwen3-30B-A3B-Instruct-2507",
-        "Qwen/Qwen3-30B-A3B-Thinking-2507",
-    ],
+    {
+        "name": "Qwen3",
+        "models": [
+            "Qwen/Qwen3-30B-A3B-Base",
+            "Qwen/Qwen3-30B-A3B-Instruct-2507",
+            "Qwen/Qwen3-30B-A3B-Thinking-2507",
+        ],
+    },
 
     # Gemma 3
-    [
-        "google/gemma-3-27b-pt",
-        "google/gemma-3-27b-it",
-    ],
+    {
+        "name": "Gemma 3",
+        "models": [
+            "google/gemma-3-27b-pt",
+            "google/gemma-3-27b-it",
+        ],
+    },
 ]
 
 for model in MODELS:
