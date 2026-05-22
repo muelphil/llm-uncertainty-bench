@@ -38,7 +38,8 @@ def ease_out(x: float, k: float = 2.0) -> float:
 
 def plot_calibration_curve(bin_confidences, bucket_accuracies, bucket_counts, colormap="Blues",
                            title=None, ax=None, xlabel="Confidence Bins", ylabel="Accuracy in Bin",
-                           total_item_count=None, fontsize=18, tick_fontsize=12, count_fontsize=8, ece=None):
+                           total_item_count=None, fontsize=18, tick_fontsize=12, count_fontsize=8,
+                           ece=None, bucket_acc_ci=None, ece_ci=None):
     """
     Plots a reliability diagram showing model calibration.
 
@@ -55,6 +56,17 @@ def plot_calibration_curve(bin_confidences, bucket_accuracies, bucket_counts, co
         colormap (str, optional): The base color for the bars. Defaults to "Blues".
         title (str, optional): The title of the plot.
         ax (matplotlib.axes.Axes, optional): The axes to plot onto. If not provided, a new figure is created.
+        total_item_count (int, optional): Used to normalise bar colours across subplots.
+        fontsize (int, optional): Font size for axis labels.
+        tick_fontsize (int, optional): Font size for axis tick labels.
+        count_fontsize (int, optional): Font size for bucket-count annotations.
+        ece (float, optional): ECE value shown in the upper-left corner.
+        bucket_acc_ci (numpy.ndarray, optional): Shape (n_buckets, 2) with
+            [lower, upper] absolute accuracy CI boundaries per bucket.
+            When provided, asymmetric error bars are drawn on each bar.
+        ece_ci (tuple[float, float], optional): (lower, upper) absolute ECE CI
+            boundaries. When provided together with *ece*, a small annotation
+            line is rendered beneath the ECE text (intended for zooming in).
 
     Returns:
         matplotlib.pyplot or None: Returns plt if ax is not provided, otherwise None.
@@ -63,7 +75,7 @@ def plot_calibration_curve(bin_confidences, bucket_accuracies, bucket_counts, co
         >>> bin_confidences = np.array([0.05, 0.15, 0.25])
         >>> bucket_accuracies = np.array([0.8, 0.6, 0.5])
         >>> bucket_counts = np.array([10, 20, 5])
-        >>> plot_calibration_curve(bin_confidences, bucket_accuracies, bucket_counts, ece)
+        >>> plot_calibration_curve(bin_confidences, bucket_accuracies, bucket_counts, ece=0.05)
     """
     # Create the plot if no ax is passed
     if ax is None:
@@ -84,6 +96,14 @@ def plot_calibration_curve(bin_confidences, bucket_accuracies, bucket_counts, co
     bin_width = bin_confidences[1] - bin_confidences[0]
     # Create bars
     bars = ax.bar(bin_confidences, bucket_accuracies, width=bin_width, color=colors, edgecolor="black")
+
+    # Asymmetric error bars for per-bucket accuracy CIs
+    if bucket_acc_ci is not None:
+        yerr_lower = np.clip(bucket_accuracies - bucket_acc_ci[:, 0], 0, None)
+        yerr_upper = np.clip(bucket_acc_ci[:, 1] - bucket_accuracies, 0, None)
+        ax.errorbar(bin_confidences, bucket_accuracies,
+                    yerr=[yerr_lower, yerr_upper],
+                    fmt="none", color="black", capsize=3, linewidth=1, zorder=5)
 
     # Plot the identity line (f(x) = x)
     ax.plot([0, 2], [0, 2], linestyle="--", color="gray")
@@ -110,6 +130,10 @@ def plot_calibration_curve(bin_confidences, bucket_accuracies, bucket_counts, co
     if ece is not None:
         ax.text(0.02, 0.98, f"ECE:{ece:.4f}", transform=ax.transAxes, fontsize=16,
                 verticalalignment='top', horizontalalignment='left', color="black")
+        if ece_ci is not None:
+            ax.text(0.02, 0.91, f"[CI:{ece_ci[0]:.4f}\u2013{ece_ci[1]:.4f}]",
+                    transform=ax.transAxes, fontsize=9,
+                    verticalalignment='top', horizontalalignment='left', color="black")
 
     y_ticks = np.arange(0.2, 1.1, 0.2)
     # Labeling the axes and title
