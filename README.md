@@ -1,8 +1,7 @@
-# Benchmarking Uncertainty Calibration in Large Language Model Long-Form Question Answering
+# Semantic Calibration Prevails Where Token Confidence Fails: Benchmarking Long-Form Scientific QA
 
 This repository contains the code, figures, and analysis scripts accompanying the paper  
-**"Benchmarking Uncertainty Calibration in Large Language Model Long-Form Question Answering"**  
-(in review for **International Conference on Machine Learning (ICML) 2026**).
+**"Semantic Calibration Prevails Where Token Confidence Fails: Benchmarking Long-Form Scientific QA"**.
 
 Uncertainty estimation is critical for reliable deployment of LLMs in scientific applications. This work benchmarks different methods to assess calibration of confidence scores in natural science question answering.
 
