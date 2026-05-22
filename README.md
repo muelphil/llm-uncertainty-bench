@@ -29,8 +29,8 @@ Each of the experiment folders `label\_prob\_calibration` and `seq\_uc\_calibrat
 ├── data_sources/     # datasource implementations containing exact dataset versions used
 ├── models.py         # model definitions and hardware-specific parameters
 ├── data/             # created when you run new benchmarks (initially empty)
-├── _data/            # contains reference outputs used in the paper, included for reproducibility
 ├── analysis.ipynb    # notebook for analyzing data and generating plots and tables
+|                     # for seq_uc_calibration execute the notebooks prepare and plot subsequently
 └── resources/        # figures and tables generated from analysis
     ├── figures
     └── tables
