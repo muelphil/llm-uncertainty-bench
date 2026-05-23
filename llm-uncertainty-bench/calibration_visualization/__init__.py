@@ -3,3 +3,4 @@ from .calculate_calibration_data import calculate_calibration_data, calculate_ca
 from .plot_calibration_curve import plot_calibration_curve
 from .ece import calculate_ece
 from .normalized_entropy import calculate_normalized_entropy
+from .calibration_correlation import calculate_calibration_correlation
