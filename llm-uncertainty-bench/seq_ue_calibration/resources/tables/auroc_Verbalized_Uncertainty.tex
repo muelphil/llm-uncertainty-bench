@@ -1,0 +1,21 @@
+\begin{center}
+  \footnotesize
+  \centering
+  \makebox[\textwidth][c]{%
+    \begin{tabular}{l c c c c c c c c c c c c}
+      \toprule
+      Dataset & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-20b}} & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-120b}} & \parbox[t]{0mm}{\rotatebox{60}{Ministral-8B-Instruct-2410}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Nemo-Instruct-2407}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Small-3.2-24B-Instruct-2506}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-3.3-70B-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-4-Scout-17B-16E-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Instruct-2507}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Thinking-2507}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Llama-70B}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Qwen-32B}} & \parbox[t]{0mm}{\rotatebox{60}{gemma-3-27b-it}} \\
+      \midrule
+      MMLU & 0.6754 & 0.7720 & 0.3979 & 0.3726 & 0.6110 & 0.6694 & 0.5072 & 0.4515 & 0.5190 & 0.5782 & 0.5643 & 0.4526 \\
+      ARC Easy & 0.8547 & 0.7946 & 0.4296 & 0.3694 & 0.7413 & 0.7447 & 0.7363 & 0.4882 & 0.5258 & 0.8354 & 0.7826 & 0.5348 \\
+      ARC Challenge & 0.8150 & 0.8830 & 0.4020 & 0.3556 & 0.7100 & 0.6935 & 0.5704 & 0.4992 & 0.5268 & 0.7130 & 0.7057 & 0.5139 \\
+      SciQ & 0.7766 & 0.8389 & 0.4750 & 0.3732 & 0.6066 & 0.6764 & 0.6129 & 0.4656 & 0.5190 & 0.7754 & 0.6976 & 0.3734 \\
+      GPQA & 0.7256 & 0.7581 & 0.3517 & 0.3167 & 0.5343 & 0.5271 & 0.4850 & 0.5830 & 0.5301 & 0.6333 & 0.6201 & 0.4151 \\
+      GSM8K & 0.6764 & 0.7093 & 0.5756 & 0.6152 & 0.5674 & 0.6055 & 0.4892 & 0.5153 & 0.4936 & 0.6276 & 0.5831 & 0.5750 \\
+      SVamp & 0.7100 & 0.8114 & 0.6485 & 0.6587 & 0.7137 & 0.7065 & 0.5942 & 0.5425 & 0.5884 & 0.5727 & 0.5940 & 0.6812 \\
+      SciBench & 0.6667 & 0.6793 & 0.5125 & 0.5979 & 0.6084 & 0.6559 & 0.5675 & 0.5334 & 0.5287 & 0.6235 & 0.5844 & 0.7025 \\
+      \bottomrule
+    \end{tabular}%
+  }
+  \captionof{table}[AUROC by Model and Dataset for Verbalized Uncertainty]{AUROC by Model and Dataset for Verbalized Uncertainty}
+\end{center}

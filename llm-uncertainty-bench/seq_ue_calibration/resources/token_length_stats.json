@@ -1,0 +1,1362 @@
+{
+    "MMLU": {
+        "gpt-oss-20b": {
+            "answer": {
+                "mean": 608.8765,
+                "std": 199.38589850188038
+            },
+            "reasoning": {
+                "mean": 437.565,
+                "std": 315.3527721649061
+            },
+            "combined": {
+                "mean": 1046.4415,
+                "std": 430.66410987601876
+            }
+        },
+        "gpt-oss-120b": {
+            "answer": {
+                "mean": 630.7264,
+                "std": 250.5000310770379
+            },
+            "reasoning": {
+                "mean": 241.2752,
+                "std": 167.74738025769082
+            },
+            "combined": {
+                "mean": 872.0016,
+                "std": 323.20423124543015
+            }
+        },
+        "Ministral-8B-Instruct-2410": {
+            "answer": {
+                "mean": 432.6236,
+                "std": 173.06642343832084
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 432.6236,
+                "std": 173.06642343832084
+            }
+        },
+        "Mistral-Nemo-Instruct-2407": {
+            "answer": {
+                "mean": 346.2214,
+                "std": 148.3735564488003
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 346.2214,
+                "std": 148.3735564488003
+            }
+        },
+        "Mistral-Small-3.2-24B-Instruct-2506": {
+            "answer": {
+                "mean": 680.8369,
+                "std": 443.62847780662383
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 680.8369,
+                "std": 443.62847780662383
+            }
+        },
+        "Llama-3.3-70B-Instruct": {
+            "answer": {
+                "mean": 483.6651,
+                "std": 323.8104468088333
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 483.6651,
+                "std": 323.8104468088333
+            }
+        },
+        "Llama-4-Scout-17B-16E-Instruct": {
+            "answer": {
+                "mean": 453.2807,
+                "std": 144.3031061556009
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 453.2807,
+                "std": 144.3031061556009
+            }
+        },
+        "Qwen3-30B-A3B-Instruct-2507": {
+            "answer": {
+                "mean": 674.8483,
+                "std": 432.4522398844618
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 674.8483,
+                "std": 432.4522398844618
+            }
+        },
+        "Qwen3-30B-A3B-Thinking-2507": {
+            "answer": {
+                "mean": 729.5375,
+                "std": 213.7696515882084
+            },
+            "reasoning": {
+                "mean": 1157.3965,
+                "std": 1144.267335923453
+            },
+            "combined": {
+                "mean": 1886.934,
+                "std": 1202.0682898493521
+            }
+        },
+        "DeepSeek-R1-Distill-Llama-70B": {
+            "answer": {
+                "mean": 182.0977,
+                "std": 142.76354891147733
+            },
+            "reasoning": {
+                "mean": 1107.6586,
+                "std": 1291.2395761477965
+            },
+            "combined": {
+                "mean": 1289.7563,
+                "std": 1355.5450486605766
+            }
+        },
+        "DeepSeek-R1-Distill-Qwen-32B": {
+            "answer": {
+                "mean": 184.6269,
+                "std": 143.20952898920285
+            },
+            "reasoning": {
+                "mean": 1272.6751,
+                "std": 1536.91014142606
+            },
+            "combined": {
+                "mean": 1457.302,
+                "std": 1604.6942704970866
+            }
+        },
+        "gemma-3-27b-it": {
+            "answer": {
+                "mean": 426.1006,
+                "std": 183.56043997319335
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 426.1006,
+                "std": 183.56043997319335
+            }
+        }
+    },
+    "ARC_Easy": {
+        "gpt-oss-20b": {
+            "answer": {
+                "mean": 524.0573,
+                "std": 192.6133396381742
+            },
+            "reasoning": {
+                "mean": 319.4597,
+                "std": 158.70957390401776
+            },
+            "combined": {
+                "mean": 843.517,
+                "std": 282.72897495362554
+            }
+        },
+        "gpt-oss-120b": {
+            "answer": {
+                "mean": 534.5257,
+                "std": 273.7395120759098
+            },
+            "reasoning": {
+                "mean": 160.1993,
+                "std": 71.16946458122949
+            },
+            "combined": {
+                "mean": 694.725,
+                "std": 305.2556483934206
+            }
+        },
+        "Ministral-8B-Instruct-2410": {
+            "answer": {
+                "mean": 322.9683,
+                "std": 102.44579742112863
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 322.9683,
+                "std": 102.44579742112863
+            }
+        },
+        "Mistral-Nemo-Instruct-2407": {
+            "answer": {
+                "mean": 279.4179,
+                "std": 78.26215660270046
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 279.4179,
+                "std": 78.26215660270046
+            }
+        },
+        "Mistral-Small-3.2-24B-Instruct-2506": {
+            "answer": {
+                "mean": 470.5963,
+                "std": 129.67195922022154
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 470.5963,
+                "std": 129.67195922022154
+            }
+        },
+        "Llama-3.3-70B-Instruct": {
+            "answer": {
+                "mean": 364.8013,
+                "std": 83.01465269195647
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 364.8013,
+                "std": 83.01465269195647
+            }
+        },
+        "Llama-4-Scout-17B-16E-Instruct": {
+            "answer": {
+                "mean": 397.2011,
+                "std": 88.22762078905342
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 397.2011,
+                "std": 88.22762078905342
+            }
+        },
+        "Qwen3-30B-A3B-Instruct-2507": {
+            "answer": {
+                "mean": 456.2749,
+                "std": 140.2579422315396
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 456.2749,
+                "std": 140.2579422315396
+            }
+        },
+        "Qwen3-30B-A3B-Thinking-2507": {
+            "answer": {
+                "mean": 692.8861,
+                "std": 228.9550501043531
+            },
+            "reasoning": {
+                "mean": 791.9548,
+                "std": 503.1567263051172
+            },
+            "combined": {
+                "mean": 1484.8409,
+                "std": 631.873488126927
+            }
+        },
+        "DeepSeek-R1-Distill-Llama-70B": {
+            "answer": {
+                "mean": 100.9885,
+                "std": 57.476437971069366
+            },
+            "reasoning": {
+                "mean": 481.7256,
+                "std": 237.32247365197009
+            },
+            "combined": {
+                "mean": 582.7141,
+                "std": 253.334667597174
+            }
+        },
+        "DeepSeek-R1-Distill-Qwen-32B": {
+            "answer": {
+                "mean": 110.13,
+                "std": 60.72940561268986
+            },
+            "reasoning": {
+                "mean": 538.6559,
+                "std": 257.0211533755894
+            },
+            "combined": {
+                "mean": 648.7859,
+                "std": 274.1468947720935
+            }
+        },
+        "gemma-3-27b-it": {
+            "answer": {
+                "mean": 286.6562,
+                "std": 105.67364332438504
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 286.6562,
+                "std": 105.67364332438504
+            }
+        }
+    },
+    "ARC_Challenge": {
+        "gpt-oss-20b": {
+            "answer": {
+                "mean": 511.9088,
+                "std": 198.6124799056631
+            },
+            "reasoning": {
+                "mean": 339.5906,
+                "std": 182.77359987296043
+            },
+            "combined": {
+                "mean": 851.4994,
+                "std": 304.5284734778603
+            }
+        },
+        "gpt-oss-120b": {
+            "answer": {
+                "mean": 501.049,
+                "std": 278.4516542083619
+            },
+            "reasoning": {
+                "mean": 175.3447,
+                "std": 81.20473817986415
+            },
+            "combined": {
+                "mean": 676.3937,
+                "std": 313.1623348442569
+            }
+        },
+        "Ministral-8B-Instruct-2410": {
+            "answer": {
+                "mean": 339.6792,
+                "std": 111.22025032235891
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 339.6792,
+                "std": 111.22025032235891
+            }
+        },
+        "Mistral-Nemo-Instruct-2407": {
+            "answer": {
+                "mean": 285.1899,
+                "std": 84.30298178157001
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 285.1899,
+                "std": 84.30298178157001
+            }
+        },
+        "Mistral-Small-3.2-24B-Instruct-2506": {
+            "answer": {
+                "mean": 498.222,
+                "std": 169.49047117163195
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 498.222,
+                "std": 169.49047117163195
+            }
+        },
+        "Llama-3.3-70B-Instruct": {
+            "answer": {
+                "mean": 379.8008,
+                "std": 93.37500205333784
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 379.8008,
+                "std": 93.37500205333784
+            }
+        },
+        "Llama-4-Scout-17B-16E-Instruct": {
+            "answer": {
+                "mean": 413.2261,
+                "std": 95.707679810909
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 413.2261,
+                "std": 95.707679810909
+            }
+        },
+        "Qwen3-30B-A3B-Instruct-2507": {
+            "answer": {
+                "mean": 492.2874,
+                "std": 168.0433749328604
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 492.2874,
+                "std": 168.0433749328604
+            }
+        },
+        "Qwen3-30B-A3B-Thinking-2507": {
+            "answer": {
+                "mean": 701.315,
+                "std": 225.53646100913363
+            },
+            "reasoning": {
+                "mean": 856.1946,
+                "std": 575.0707971832836
+            },
+            "combined": {
+                "mean": 1557.5096,
+                "std": 691.6534731789728
+            }
+        },
+        "DeepSeek-R1-Distill-Llama-70B": {
+            "answer": {
+                "mean": 111.1541,
+                "std": 71.3308738383756
+            },
+            "reasoning": {
+                "mean": 510.8405,
+                "std": 256.2561155941999
+            },
+            "combined": {
+                "mean": 621.9946,
+                "std": 267.1190300754756
+            }
+        },
+        "DeepSeek-R1-Distill-Qwen-32B": {
+            "answer": {
+                "mean": 119.0753,
+                "std": 71.14574057208313
+            },
+            "reasoning": {
+                "mean": 571.7233,
+                "std": 296.70568272840063
+            },
+            "combined": {
+                "mean": 690.7986,
+                "std": 309.5226903922017
+            }
+        },
+        "gemma-3-27b-it": {
+            "answer": {
+                "mean": 299.0777,
+                "std": 106.5390197016187
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 299.0777,
+                "std": 106.5390197016187
+            }
+        }
+    },
+    "SciQ": {
+        "gpt-oss-20b": {
+            "answer": {
+                "mean": 511.749,
+                "std": 155.1592634640416
+            },
+            "reasoning": {
+                "mean": 326.5195,
+                "std": 186.0746178179324
+            },
+            "combined": {
+                "mean": 838.2685,
+                "std": 272.79604904797947
+            }
+        },
+        "gpt-oss-120b": {
+            "answer": {
+                "mean": 475.939,
+                "std": 222.39306586891297
+            },
+            "reasoning": {
+                "mean": 164.9874,
+                "std": 76.68228516760473
+            },
+            "combined": {
+                "mean": 640.9264,
+                "std": 257.2322799098565
+            }
+        },
+        "Ministral-8B-Instruct-2410": {
+            "answer": {
+                "mean": 303.416,
+                "std": 98.32473096465571
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 303.416,
+                "std": 98.32473096465571
+            }
+        },
+        "Mistral-Nemo-Instruct-2407": {
+            "answer": {
+                "mean": 248.1276,
+                "std": 72.31030352750308
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 248.1276,
+                "std": 72.31030352750308
+            }
+        },
+        "Mistral-Small-3.2-24B-Instruct-2506": {
+            "answer": {
+                "mean": 457.8233,
+                "std": 130.81182228833538
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 457.8233,
+                "std": 130.81182228833538
+            }
+        },
+        "Llama-3.3-70B-Instruct": {
+            "answer": {
+                "mean": 357.3074,
+                "std": 76.75500790413507
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 357.3074,
+                "std": 76.75500790413507
+            }
+        },
+        "Llama-4-Scout-17B-16E-Instruct": {
+            "answer": {
+                "mean": 385.3159,
+                "std": 78.4095741177143
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 385.3159,
+                "std": 78.4095741177143
+            }
+        },
+        "Qwen3-30B-A3B-Instruct-2507": {
+            "answer": {
+                "mean": 455.9766,
+                "std": 196.93057816830216
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 455.9766,
+                "std": 196.93057816830216
+            }
+        },
+        "Qwen3-30B-A3B-Thinking-2507": {
+            "answer": {
+                "mean": 689.2715,
+                "std": 250.51762791456332
+            },
+            "reasoning": {
+                "mean": 806.6387,
+                "std": 540.328441269525
+            },
+            "combined": {
+                "mean": 1495.9102,
+                "std": 691.9237462199272
+            }
+        },
+        "DeepSeek-R1-Distill-Llama-70B": {
+            "answer": {
+                "mean": 94.535,
+                "std": 56.39178999107796
+            },
+            "reasoning": {
+                "mean": 453.5881,
+                "std": 177.47380576739587
+            },
+            "combined": {
+                "mean": 548.1231,
+                "std": 193.0596605965238
+            }
+        },
+        "DeepSeek-R1-Distill-Qwen-32B": {
+            "answer": {
+                "mean": 99.7336,
+                "std": 56.20447424656273
+            },
+            "reasoning": {
+                "mean": 525.4069,
+                "std": 236.45975778997874
+            },
+            "combined": {
+                "mean": 625.1405,
+                "std": 252.92989564889575
+            }
+        },
+        "gemma-3-27b-it": {
+            "answer": {
+                "mean": 280.1879,
+                "std": 100.11083963093688
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 280.1879,
+                "std": 100.11083963093688
+            }
+        }
+    },
+    "GPQA": {
+        "gpt-oss-20b": {
+            "answer": {
+                "mean": 636.6919,
+                "std": 406.0539128642959
+            },
+            "reasoning": {
+                "mean": 2200.8206,
+                "std": 2315.417951006778
+            },
+            "combined": {
+                "mean": 2837.5125,
+                "std": 2274.061639375177
+            }
+        },
+        "gpt-oss-120b": {
+            "answer": {
+                "mean": 560.002,
+                "std": 461.07738659756797
+            },
+            "reasoning": {
+                "mean": 1193.8918,
+                "std": 1145.63551924993
+            },
+            "combined": {
+                "mean": 1753.8938,
+                "std": 1226.3038108989235
+            }
+        },
+        "Ministral-8B-Instruct-2410": {
+            "answer": {
+                "mean": 631.5468,
+                "std": 195.78836257053638
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 631.5468,
+                "std": 195.78836257053638
+            }
+        },
+        "Mistral-Nemo-Instruct-2407": {
+            "answer": {
+                "mean": 515.1406,
+                "std": 202.36660064285704
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 515.1406,
+                "std": 202.36660064285704
+            }
+        },
+        "Mistral-Small-3.2-24B-Instruct-2506": {
+            "answer": {
+                "mean": 1337.4605,
+                "std": 903.7551494607196
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 1337.4605,
+                "std": 903.7551494607196
+            }
+        },
+        "Llama-3.3-70B-Instruct": {
+            "answer": {
+                "mean": 948.7366,
+                "std": 536.2465916545727
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 948.7366,
+                "std": 536.2465916545727
+            }
+        },
+        "Llama-4-Scout-17B-16E-Instruct": {
+            "answer": {
+                "mean": 749.1133,
+                "std": 232.9891573826039
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 749.1133,
+                "std": 232.9891573826039
+            }
+        },
+        "Qwen3-30B-A3B-Instruct-2507": {
+            "answer": {
+                "mean": 2824.4609,
+                "std": 1302.4145295687824
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 2824.4609,
+                "std": 1302.4145295687824
+            }
+        },
+        "Qwen3-30B-A3B-Thinking-2507": {
+            "answer": {
+                "mean": 664.4799,
+                "std": 504.40732773346696
+            },
+            "reasoning": {
+                "mean": 6162.9252,
+                "std": 3517.0819153845296
+            },
+            "combined": {
+                "mean": 6827.4051,
+                "std": 3212.9502447939562
+            }
+        },
+        "DeepSeek-R1-Distill-Llama-70B": {
+            "answer": {
+                "mean": 257.7744,
+                "std": 190.65397476123715
+            },
+            "reasoning": {
+                "mean": 4042.5046,
+                "std": 2903.0034394352197
+            },
+            "combined": {
+                "mean": 4300.279,
+                "std": 2927.713768513081
+            }
+        },
+        "DeepSeek-R1-Distill-Qwen-32B": {
+            "answer": {
+                "mean": 263.4812,
+                "std": 221.22501191580872
+            },
+            "reasoning": {
+                "mean": 4987.7554,
+                "std": 3337.6297241588077
+            },
+            "combined": {
+                "mean": 5251.2366,
+                "std": 3321.9103134843244
+            }
+        },
+        "gemma-3-27b-it": {
+            "answer": {
+                "mean": 855.9885,
+                "std": 345.1127404894157
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 855.9885,
+                "std": 345.1127404894157
+            }
+        }
+    },
+    "GSM8K": {
+        "gpt-oss-20b": {
+            "answer": {
+                "mean": 161.7012,
+                "std": 70.22880856729033
+            },
+            "reasoning": {
+                "mean": 313.142,
+                "std": 397.31187614614635
+            },
+            "combined": {
+                "mean": 474.8432,
+                "std": 433.32795231725333
+            }
+        },
+        "gpt-oss-120b": {
+            "answer": {
+                "mean": 179.174,
+                "std": 76.72925045346174
+            },
+            "reasoning": {
+                "mean": 167.9508,
+                "std": 148.42295013983278
+            },
+            "combined": {
+                "mean": 347.1248,
+                "std": 204.66127655276676
+            }
+        },
+        "Ministral-8B-Instruct-2410": {
+            "answer": {
+                "mean": 224.5748,
+                "std": 91.37280120736254
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 224.5748,
+                "std": 91.37280120736254
+            }
+        },
+        "Mistral-Nemo-Instruct-2407": {
+            "answer": {
+                "mean": 225.8676,
+                "std": 84.10506485946019
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 225.8676,
+                "std": 84.10506485946019
+            }
+        },
+        "Mistral-Small-3.2-24B-Instruct-2506": {
+            "answer": {
+                "mean": 435.3336,
+                "std": 351.934348174784
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 435.3336,
+                "std": 351.934348174784
+            }
+        },
+        "Llama-3.3-70B-Instruct": {
+            "answer": {
+                "mean": 243.9108,
+                "std": 73.69445564272111
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 243.9108,
+                "std": 73.69445564272111
+            }
+        },
+        "Llama-4-Scout-17B-16E-Instruct": {
+            "answer": {
+                "mean": 230.6536,
+                "std": 68.78453701270962
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 230.6536,
+                "std": 68.78453701270962
+            }
+        },
+        "Qwen3-30B-A3B-Instruct-2507": {
+            "answer": {
+                "mean": 305.4748,
+                "std": 303.21620238885066
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 305.4748,
+                "std": 303.21620238885066
+            }
+        },
+        "Qwen3-30B-A3B-Thinking-2507": {
+            "answer": {
+                "mean": 263.9752,
+                "std": 102.93144776080463
+            },
+            "reasoning": {
+                "mean": 830.802,
+                "std": 644.8483841736975
+            },
+            "combined": {
+                "mean": 1094.7772,
+                "std": 701.3095596093923
+            }
+        },
+        "DeepSeek-R1-Distill-Llama-70B": {
+            "answer": {
+                "mean": 277.8284,
+                "std": 88.16410220155822
+            },
+            "reasoning": {
+                "mean": 319.1284,
+                "std": 537.4934176183307
+            },
+            "combined": {
+                "mean": 596.9568,
+                "std": 536.5336998718714
+            }
+        },
+        "DeepSeek-R1-Distill-Qwen-32B": {
+            "answer": {
+                "mean": 293.8468,
+                "std": 85.41809779158122
+            },
+            "reasoning": {
+                "mean": 243.1908,
+                "std": 426.84172984877677
+            },
+            "combined": {
+                "mean": 537.0376,
+                "std": 438.70232102968265
+            }
+        },
+        "gemma-3-27b-it": {
+            "answer": {
+                "mean": 248.4544,
+                "std": 156.97844187379758
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 248.4544,
+                "std": 156.97844187379758
+            }
+        }
+    },
+    "SVamp": {
+        "gpt-oss-20b": {
+            "answer": {
+                "mean": 97.2216,
+                "std": 52.2627999014731
+            },
+            "reasoning": {
+                "mean": 211.5376,
+                "std": 265.9091086214595
+            },
+            "combined": {
+                "mean": 308.7592,
+                "std": 287.4271172914306
+            }
+        },
+        "gpt-oss-120b": {
+            "answer": {
+                "mean": 113.1296,
+                "std": 61.993926336384284
+            },
+            "reasoning": {
+                "mean": 125.4784,
+                "std": 142.29861099573858
+            },
+            "combined": {
+                "mean": 238.608,
+                "std": 181.83457718867595
+            }
+        },
+        "Ministral-8B-Instruct-2410": {
+            "answer": {
+                "mean": 127.1784,
+                "std": 127.78090685819616
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 127.1784,
+                "std": 127.78090685819616
+            }
+        },
+        "Mistral-Nemo-Instruct-2407": {
+            "answer": {
+                "mean": 133.9788,
+                "std": 105.56346246880766
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 133.9788,
+                "std": 105.56346246880766
+            }
+        },
+        "Mistral-Small-3.2-24B-Instruct-2506": {
+            "answer": {
+                "mean": 284.0684,
+                "std": 275.90788641529343
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 284.0684,
+                "std": 275.90788641529343
+            }
+        },
+        "Llama-3.3-70B-Instruct": {
+            "answer": {
+                "mean": 198.4608,
+                "std": 290.9173491302469
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 198.4608,
+                "std": 290.9173491302469
+            }
+        },
+        "Llama-4-Scout-17B-16E-Instruct": {
+            "answer": {
+                "mean": 202.0516,
+                "std": 268.52874261740527
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 202.0516,
+                "std": 268.52874261740527
+            }
+        },
+        "Qwen3-30B-A3B-Instruct-2507": {
+            "answer": {
+                "mean": 310.5928,
+                "std": 591.0761495729612
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 310.5928,
+                "std": 591.0761495729612
+            }
+        },
+        "Qwen3-30B-A3B-Thinking-2507": {
+            "answer": {
+                "mean": 168.6796,
+                "std": 86.21180623356422
+            },
+            "reasoning": {
+                "mean": 632.5152,
+                "std": 643.3297237205264
+            },
+            "combined": {
+                "mean": 801.1948,
+                "std": 694.7181608264987
+            }
+        },
+        "DeepSeek-R1-Distill-Llama-70B": {
+            "answer": {
+                "mean": 205.1324,
+                "std": 77.44735829944767
+            },
+            "reasoning": {
+                "mean": 125.4176,
+                "std": 188.04933882301398
+            },
+            "combined": {
+                "mean": 330.55,
+                "std": 206.50060847493938
+            }
+        },
+        "DeepSeek-R1-Distill-Qwen-32B": {
+            "answer": {
+                "mean": 200.1568,
+                "std": 69.43276299551154
+            },
+            "reasoning": {
+                "mean": 112.6424,
+                "std": 88.84345663105675
+            },
+            "combined": {
+                "mean": 312.7992,
+                "std": 120.41263123137882
+            }
+        },
+        "gemma-3-27b-it": {
+            "answer": {
+                "mean": 180.3336,
+                "std": 187.05083992788457
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 180.3336,
+                "std": 187.05083992788457
+            }
+        }
+    },
+    "SciBench": {
+        "gpt-oss-20b": {
+            "answer": {
+                "mean": 145.6892,
+                "std": 182.81901027947785
+            },
+            "reasoning": {
+                "mean": 2107.6712,
+                "std": 2259.3499744867872
+            },
+            "combined": {
+                "mean": 2253.3604,
+                "std": 2270.32819005272
+            }
+        },
+        "gpt-oss-120b": {
+            "answer": {
+                "mean": 255.4624,
+                "std": 209.4156024370143
+            },
+            "reasoning": {
+                "mean": 1064.884,
+                "std": 905.5079787742621
+            },
+            "combined": {
+                "mean": 1320.3464,
+                "std": 964.1052301304801
+            }
+        },
+        "Ministral-8B-Instruct-2410": {
+            "answer": {
+                "mean": 712.7412,
+                "std": 234.09768156127677
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 712.7412,
+                "std": 234.09768156127677
+            }
+        },
+        "Mistral-Nemo-Instruct-2407": {
+            "answer": {
+                "mean": 532.6604,
+                "std": 280.9345552999571
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 532.6604,
+                "std": 280.9345552999571
+            }
+        },
+        "Mistral-Small-3.2-24B-Instruct-2506": {
+            "answer": {
+                "mean": 1330.056,
+                "std": 1032.7631511409293
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 1330.056,
+                "std": 1032.7631511409293
+            }
+        },
+        "Llama-3.3-70B-Instruct": {
+            "answer": {
+                "mean": 764.634,
+                "std": 384.330221465412
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 764.634,
+                "std": 384.330221465412
+            }
+        },
+        "Llama-4-Scout-17B-16E-Instruct": {
+            "answer": {
+                "mean": 770.782,
+                "std": 382.89774032738706
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 770.782,
+                "std": 382.89774032738706
+            }
+        },
+        "Qwen3-30B-A3B-Instruct-2507": {
+            "answer": {
+                "mean": 2138.8828,
+                "std": 1483.9661888749522
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 2138.8828,
+                "std": 1483.9661888749522
+            }
+        },
+        "Qwen3-30B-A3B-Thinking-2507": {
+            "answer": {
+                "mean": 448.8412,
+                "std": 300.1624529847674
+            },
+            "reasoning": {
+                "mean": 5781.6408,
+                "std": 3364.3681395719445
+            },
+            "combined": {
+                "mean": 6230.482,
+                "std": 3251.992342573159
+            }
+        },
+        "DeepSeek-R1-Distill-Llama-70B": {
+            "answer": {
+                "mean": 432.6004,
+                "std": 231.60049619069108
+            },
+            "reasoning": {
+                "mean": 4225.1924,
+                "std": 3442.7232337043583
+            },
+            "combined": {
+                "mean": 4657.7928,
+                "std": 3398.0327638994263
+            }
+        },
+        "DeepSeek-R1-Distill-Qwen-32B": {
+            "answer": {
+                "mean": 408.0712,
+                "std": 253.09652481001862
+            },
+            "reasoning": {
+                "mean": 5558.3436,
+                "std": 3343.641421672146
+            },
+            "combined": {
+                "mean": 5966.4148,
+                "std": 3266.794043472889
+            }
+        },
+        "gemma-3-27b-it": {
+            "answer": {
+                "mean": 951.398,
+                "std": 522.7716538574282
+            },
+            "reasoning": {
+                "mean": 0.0,
+                "std": 0.0
+            },
+            "combined": {
+                "mean": 951.398,
+                "std": 522.7716538574282
+            }
+        }
+    }
+}

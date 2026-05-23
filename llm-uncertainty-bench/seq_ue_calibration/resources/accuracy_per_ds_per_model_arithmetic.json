@@ -1,0 +1,536 @@
+{
+    "GSM8K": {
+        "gpt-oss-20b": {
+            "totally_correct_questions": 219,
+            "accuracy_questions": 0.876,
+            "accuracy": 0.9444,
+            "different_answer_count": {
+                "1": 226,
+                "2": 22,
+                "3": 2
+            },
+            "different_answer_count_mean": 1.104,
+            "different_answer_count_std": 0.3304300228490141
+        },
+        "gpt-oss-120b": {
+            "totally_correct_questions": 232,
+            "accuracy_questions": 0.928,
+            "accuracy": 0.9476,
+            "different_answer_count": {
+                "1": 241,
+                "3": 2,
+                "2": 6,
+                "4": 1
+            },
+            "different_answer_count_mean": 1.052,
+            "different_answer_count_std": 0.29882436312991617
+        },
+        "Ministral-8B-Instruct-2410": {
+            "totally_correct_questions": 163,
+            "accuracy_questions": 0.652,
+            "accuracy": 0.8944,
+            "different_answer_count": {
+                "1": 165,
+                "2": 55,
+                "4": 4,
+                "5": 2,
+                "3": 20,
+                "7": 1,
+                "6": 3
+            },
+            "different_answer_count_mean": 1.544,
+            "different_answer_count_std": 0.9798285564321954
+        },
+        "Mistral-Nemo-Instruct-2407": {
+            "totally_correct_questions": 139,
+            "accuracy_questions": 0.556,
+            "accuracy": 0.8508,
+            "different_answer_count": {
+                "1": 145,
+                "3": 31,
+                "2": 49,
+                "4": 12,
+                "7": 2,
+                "6": 3,
+                "5": 6,
+                "8": 2
+            },
+            "different_answer_count_mean": 1.848,
+            "different_answer_count_std": 1.3299984962397515
+        },
+        "Mistral-Small-3.2-24B-Instruct-2506": {
+            "totally_correct_questions": 231,
+            "accuracy_questions": 0.924,
+            "accuracy": 0.9544,
+            "different_answer_count": {
+                "1": 237,
+                "2": 12,
+                "4": 1
+            },
+            "different_answer_count_mean": 1.06,
+            "different_answer_count_std": 0.2835489375751565
+        },
+        "Llama-3.3-70B-Instruct": {
+            "totally_correct_questions": 240,
+            "accuracy_questions": 0.96,
+            "accuracy": 0.9728,
+            "different_answer_count": {
+                "1": 245,
+                "2": 5
+            },
+            "different_answer_count_mean": 1.02,
+            "different_answer_count_std": 0.13999999999999999
+        },
+        "Llama-4-Scout-17B-16E-Instruct": {
+            "totally_correct_questions": 239,
+            "accuracy_questions": 0.956,
+            "accuracy": 0.966,
+            "different_answer_count": {
+                "1": 244,
+                "2": 4,
+                "3": 2
+            },
+            "different_answer_count_mean": 1.032,
+            "different_answer_count_std": 0.21673947494630505
+        },
+        "Qwen3-30B-A3B-Instruct-2507": {
+            "totally_correct_questions": 236,
+            "accuracy_questions": 0.944,
+            "accuracy": 0.9584,
+            "different_answer_count": {
+                "1": 243,
+                "2": 6,
+                "5": 1
+            },
+            "different_answer_count_mean": 1.04,
+            "different_answer_count_std": 0.29393876913398137
+        },
+        "Qwen3-30B-A3B-Thinking-2507": {
+            "totally_correct_questions": 176,
+            "accuracy_questions": 0.704,
+            "accuracy": 0.9096,
+            "different_answer_count": {
+                "1": 244,
+                "2": 4,
+                "3": 2
+            },
+            "different_answer_count_mean": 1.032,
+            "different_answer_count_std": 0.21673947494630505
+        },
+        "DeepSeek-R1-Distill-Llama-70B": {
+            "totally_correct_questions": 207,
+            "accuracy_questions": 0.828,
+            "accuracy": 0.9492,
+            "different_answer_count": {
+                "1": 211,
+                "2": 33,
+                "3": 5,
+                "4": 1
+            },
+            "different_answer_count_mean": 1.184,
+            "different_answer_count_std": 0.46275695564734626
+        },
+        "DeepSeek-R1-Distill-Qwen-32B": {
+            "totally_correct_questions": 214,
+            "accuracy_questions": 0.856,
+            "accuracy": 0.9328,
+            "different_answer_count": {
+                "1": 223,
+                "2": 22,
+                "3": 5
+            },
+            "different_answer_count_mean": 1.128,
+            "different_answer_count_std": 0.3893789927564146
+        },
+        "gemma-3-27b-it": {
+            "totally_correct_questions": 227,
+            "accuracy_questions": 0.908,
+            "accuracy": 0.9424,
+            "different_answer_count": {
+                "1": 237,
+                "2": 9,
+                "3": 3,
+                "5": 1
+            },
+            "different_answer_count_mean": 1.076,
+            "different_answer_count_std": 0.37712597364806366
+        }
+    },
+    "SVamp": {
+        "gpt-oss-20b": {
+            "totally_correct_questions": 228,
+            "accuracy_questions": 0.912,
+            "accuracy": 0.9544,
+            "different_answer_count": {
+                "1": 235,
+                "2": 14,
+                "3": 1
+            },
+            "different_answer_count_mean": 1.064,
+            "different_answer_count_std": 0.2605839595984373
+        },
+        "gpt-oss-120b": {
+            "totally_correct_questions": 232,
+            "accuracy_questions": 0.928,
+            "accuracy": 0.9572,
+            "different_answer_count": {
+                "1": 236,
+                "2": 12,
+                "3": 2
+            },
+            "different_answer_count_mean": 1.064,
+            "different_answer_count_std": 0.275506805723561
+        },
+        "Ministral-8B-Instruct-2410": {
+            "totally_correct_questions": 189,
+            "accuracy_questions": 0.756,
+            "accuracy": 0.9108,
+            "different_answer_count": {
+                "1": 198,
+                "2": 24,
+                "3": 22,
+                "6": 2,
+                "4": 3,
+                "5": 1
+            },
+            "different_answer_count_mean": 1.364,
+            "different_answer_count_std": 0.8291586096760981
+        },
+        "Mistral-Nemo-Instruct-2407": {
+            "totally_correct_questions": 175,
+            "accuracy_questions": 0.7,
+            "accuracy": 0.8924,
+            "different_answer_count": {
+                "1": 185,
+                "3": 11,
+                "6": 2,
+                "2": 38,
+                "4": 6,
+                "5": 6,
+                "7": 1,
+                "8": 1
+            },
+            "different_answer_count_mean": 1.5,
+            "different_answer_count_std": 1.1036303729057115
+        },
+        "Mistral-Small-3.2-24B-Instruct-2506": {
+            "totally_correct_questions": 222,
+            "accuracy_questions": 0.888,
+            "accuracy": 0.9364,
+            "different_answer_count": {
+                "1": 229,
+                "3": 6,
+                "2": 12,
+                "4": 3
+            },
+            "different_answer_count_mean": 1.132,
+            "different_answer_count_std": 0.4843304656946536
+        },
+        "Llama-3.3-70B-Instruct": {
+            "totally_correct_questions": 231,
+            "accuracy_questions": 0.924,
+            "accuracy": 0.9528,
+            "different_answer_count": {
+                "1": 235,
+                "7": 1,
+                "3": 6,
+                "2": 8
+            },
+            "different_answer_count_mean": 1.104,
+            "different_answer_count_std": 0.511061640117902
+        },
+        "Llama-4-Scout-17B-16E-Instruct": {
+            "totally_correct_questions": 228,
+            "accuracy_questions": 0.912,
+            "accuracy": 0.9396,
+            "different_answer_count": {
+                "1": 232,
+                "8": 1,
+                "4": 3,
+                "2": 9,
+                "3": 5
+            },
+            "different_answer_count_mean": 1.14,
+            "different_answer_count_std": 0.632771680782255
+        },
+        "Qwen3-30B-A3B-Instruct-2507": {
+            "totally_correct_questions": 234,
+            "accuracy_questions": 0.936,
+            "accuracy": 0.9592,
+            "different_answer_count": {
+                "1": 242,
+                "0": 1,
+                "2": 7
+            },
+            "different_answer_count_mean": 1.024,
+            "different_answer_count_std": 0.1772681584492827
+        },
+        "Qwen3-30B-A3B-Thinking-2507": {
+            "totally_correct_questions": 206,
+            "accuracy_questions": 0.824,
+            "accuracy": 0.9432,
+            "different_answer_count": {
+                "1": 244,
+                "2": 4,
+                "3": 2
+            },
+            "different_answer_count_mean": 1.032,
+            "different_answer_count_std": 0.21673947494630505
+        },
+        "DeepSeek-R1-Distill-Llama-70B": {
+            "totally_correct_questions": 140,
+            "accuracy_questions": 0.56,
+            "accuracy": 0.8568,
+            "different_answer_count": {
+                "1": 199,
+                "2": 35,
+                "4": 3,
+                "3": 13
+            },
+            "different_answer_count_mean": 1.28,
+            "different_answer_count_std": 0.6144916598294886
+        },
+        "DeepSeek-R1-Distill-Qwen-32B": {
+            "totally_correct_questions": 217,
+            "accuracy_questions": 0.868,
+            "accuracy": 0.9396,
+            "different_answer_count": {
+                "1": 222,
+                "3": 8,
+                "2": 17,
+                "4": 3
+            },
+            "different_answer_count_mean": 1.168,
+            "different_answer_count_std": 0.5251437898328418
+        },
+        "gemma-3-27b-it": {
+            "totally_correct_questions": 233,
+            "accuracy_questions": 0.932,
+            "accuracy": 0.9556,
+            "different_answer_count": {
+                "1": 238,
+                "6": 1,
+                "2": 11
+            },
+            "different_answer_count_mean": 1.064,
+            "different_answer_count_std": 0.3740374312819507
+        }
+    },
+    "SciBench": {
+        "gpt-oss-20b": {
+            "totally_correct_questions": 53,
+            "accuracy_questions": 0.212,
+            "accuracy": 0.406,
+            "different_answer_count": {
+                "3": 44,
+                "10": 3,
+                "1": 60,
+                "5": 28,
+                "6": 12,
+                "2": 62,
+                "4": 29,
+                "9": 4,
+                "7": 5,
+                "8": 3
+            },
+            "different_answer_count_mean": 3.076,
+            "different_answer_count_std": 1.9955510517147887
+        },
+        "gpt-oss-120b": {
+            "totally_correct_questions": 61,
+            "accuracy_questions": 0.244,
+            "accuracy": 0.424,
+            "different_answer_count": {
+                "2": 65,
+                "3": 59,
+                "5": 15,
+                "1": 66,
+                "4": 33,
+                "6": 7,
+                "8": 5
+            },
+            "different_answer_count_mean": 2.648,
+            "different_answer_count_std": 1.5218725307988181
+        },
+        "Ministral-8B-Instruct-2410": {
+            "totally_correct_questions": 5,
+            "accuracy_questions": 0.02,
+            "accuracy": 0.178,
+            "different_answer_count": {
+                "5": 30,
+                "8": 48,
+                "9": 34,
+                "2": 10,
+                "10": 25,
+                "4": 18,
+                "7": 36,
+                "6": 32,
+                "3": 11,
+                "1": 6
+            },
+            "different_answer_count_mean": 6.66,
+            "different_answer_count_std": 2.31179583873663
+        },
+        "Mistral-Nemo-Instruct-2407": {
+            "totally_correct_questions": 3,
+            "accuracy_questions": 0.012,
+            "accuracy": 0.1756,
+            "different_answer_count": {
+                "7": 39,
+                "8": 40,
+                "5": 31,
+                "2": 9,
+                "6": 36,
+                "9": 30,
+                "10": 29,
+                "4": 24,
+                "3": 7,
+                "1": 5
+            },
+            "different_answer_count_mean": 6.656,
+            "different_answer_count_std": 2.2666415684884984
+        },
+        "Mistral-Small-3.2-24B-Instruct-2506": {
+            "totally_correct_questions": 60,
+            "accuracy_questions": 0.24,
+            "accuracy": 0.5172,
+            "different_answer_count": {
+                "2": 57,
+                "1": 70,
+                "4": 34,
+                "3": 27,
+                "10": 1,
+                "7": 11,
+                "9": 3,
+                "6": 13,
+                "5": 29,
+                "8": 5
+            },
+            "different_answer_count_mean": 3.112,
+            "different_answer_count_std": 2.058022351676483
+        },
+        "Llama-3.3-70B-Instruct": {
+            "totally_correct_questions": 59,
+            "accuracy_questions": 0.236,
+            "accuracy": 0.4584,
+            "different_answer_count": {
+                "2": 49,
+                "1": 74,
+                "3": 32,
+                "7": 10,
+                "8": 5,
+                "5": 27,
+                "4": 33,
+                "6": 17,
+                "10": 1,
+                "9": 2
+            },
+            "different_answer_count_mean": 3.1,
+            "different_answer_count_std": 2.0420577856662137
+        },
+        "Llama-4-Scout-17B-16E-Instruct": {
+            "totally_correct_questions": 102,
+            "accuracy_questions": 0.408,
+            "accuracy": 0.6056,
+            "different_answer_count": {
+                "1": 123,
+                "2": 65,
+                "3": 25,
+                "5": 8,
+                "4": 16,
+                "6": 8,
+                "7": 4,
+                "8": 1
+            },
+            "different_answer_count_mean": 2.064,
+            "different_answer_count_std": 1.4791565163970988
+        },
+        "Qwen3-30B-A3B-Instruct-2507": {
+            "totally_correct_questions": 123,
+            "accuracy_questions": 0.492,
+            "accuracy": 0.6424,
+            "different_answer_count": {
+                "2": 53,
+                "1": 153,
+                "4": 14,
+                "8": 2,
+                "5": 4,
+                "7": 1,
+                "3": 18,
+                "6": 5
+            },
+            "different_answer_count_mean": 1.768,
+            "different_answer_count_std": 1.3062067217710986
+        },
+        "Qwen3-30B-A3B-Thinking-2507": {
+            "totally_correct_questions": 56,
+            "accuracy_questions": 0.224,
+            "accuracy": 0.4156,
+            "different_answer_count": {
+                "2": 82,
+                "1": 128,
+                "0": 18,
+                "3": 16,
+                "4": 4,
+                "5": 1,
+                "6": 1
+            },
+            "different_answer_count_mean": 1.468,
+            "different_answer_count_std": 0.8631199221429198
+        },
+        "DeepSeek-R1-Distill-Llama-70B": {
+            "totally_correct_questions": 33,
+            "accuracy_questions": 0.132,
+            "accuracy": 0.3768,
+            "different_answer_count": {
+                "3": 46,
+                "8": 3,
+                "2": 76,
+                "1": 53,
+                "4": 38,
+                "5": 21,
+                "6": 9,
+                "7": 2,
+                "0": 2
+            },
+            "different_answer_count_mean": 2.768,
+            "different_answer_count_std": 1.5524741543742364
+        },
+        "DeepSeek-R1-Distill-Qwen-32B": {
+            "totally_correct_questions": 38,
+            "accuracy_questions": 0.152,
+            "accuracy": 0.38,
+            "different_answer_count": {
+                "1": 60,
+                "3": 58,
+                "4": 32,
+                "2": 61,
+                "6": 11,
+                "7": 5,
+                "5": 17,
+                "0": 4,
+                "8": 2
+            },
+            "different_answer_count_mean": 2.744,
+            "different_answer_count_std": 1.6119751859132325
+        },
+        "gemma-3-27b-it": {
+            "totally_correct_questions": 73,
+            "accuracy_questions": 0.292,
+            "accuracy": 0.5472,
+            "different_answer_count": {
+                "2": 57,
+                "4": 20,
+                "1": 89,
+                "6": 22,
+                "8": 2,
+                "9": 2,
+                "3": 33,
+                "5": 18,
+                "7": 7
+            },
+            "different_answer_count_mean": 2.748,
+            "different_answer_count_std": 1.919504102626509
+        }
+    }
+}

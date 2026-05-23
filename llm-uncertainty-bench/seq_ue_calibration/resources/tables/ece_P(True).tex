@@ -1,0 +1,21 @@
+\begin{center}
+  \footnotesize
+  \centering
+  \makebox[\textwidth][c]{%
+    \begin{tabular}{l c c c c c c c c c c c c}
+      \toprule
+      Dataset & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-20b}} & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-120b}} & \parbox[t]{0mm}{\rotatebox{60}{Ministral-8B-Instruct-2410}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Nemo-Instruct-2407}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Small-3.2-24B-Instruct-2506}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-3.3-70B-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-4-Scout-17B-16E-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Instruct-2507}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Thinking-2507}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Llama-70B}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Qwen-32B}} & \parbox[t]{0mm}{\rotatebox{60}{gemma-3-27b-it}} \\
+      \midrule
+      MMLU & 0.1254 & 0.0963 & 0.3379 & 0.6015 & 0.3545 & 0.3433 & 0.0830 & 0.1137 & 0.5266 & 0.2382 & 0.0683 & 0.1170 \\
+      ARC Easy & 0.0736 & 0.0730 & 0.2935 & 0.5206 & 0.1311 & 0.0873 & 0.0331 & 0.0354 & 0.5266 & 0.3181 & 0.0565 & 0.0086 \\
+      ARC Challenge & 0.1100 & 0.0847 & 0.3034 & 0.5629 & 0.1802 & 0.1008 & 0.0253 & 0.0397 & 0.5034 & 0.2958 & 0.0801 & 0.0291 \\
+      SciQ & 0.0317 & 0.0475 & 0.2654 & 0.4829 & 0.1826 & 0.0850 & 0.0237 & 0.0137 & 0.5186 & 0.3168 & 0.0717 & 0.0168 \\
+      GPQA & 0.2370 & 0.2188 & 0.3133 & 0.6522 & 0.4286 & 0.5007 & 0.3177 & 0.3259 & 0.3735 & 0.1807 & 0.3030 & 0.4339 \\
+      GSM8K & 0.0234 & 0.0183 & 0.3113 & 0.0741 & 0.0311 & 0.0138 & 0.0007 & 0.0070 & 0.0314 & 0.3542 & 0.0524 & 0.0574 \\
+      SVamp & 0.0127 & 0.0124 & 0.2690 & 0.0658 & 0.0521 & 0.0108 & 0.0239 & 0.0205 & 0.0346 & 0.2908 & 0.0437 & 0.0778 \\
+      SciBench & 0.4884 & 0.5018 & 0.1363 & 0.2194 & 0.1258 & 0.4238 & 0.3609 & 0.2390 & 0.3024 & 0.3345 & 0.4493 & 0.2914 \\
+      \bottomrule
+    \end{tabular}%
+  }
+  \captionof{table}[ECE by Model and Dataset for P(True)]{ECE by Model and Dataset for P(True)}
+\end{center}

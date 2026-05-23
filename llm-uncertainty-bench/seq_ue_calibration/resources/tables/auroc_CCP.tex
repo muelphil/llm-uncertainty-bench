@@ -1,0 +1,21 @@
+\begin{center}
+  \footnotesize
+  \centering
+  \makebox[\textwidth][c]{%
+    \begin{tabular}{l c c c c c c c c c c c c}
+      \toprule
+      Dataset & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-20b}} & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-120b}} & \parbox[t]{0mm}{\rotatebox{60}{Ministral-8B-Instruct-2410}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Nemo-Instruct-2407}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Small-3.2-24B-Instruct-2506}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-3.3-70B-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-4-Scout-17B-16E-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Instruct-2507}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Thinking-2507}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Llama-70B}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Qwen-32B}} & \parbox[t]{0mm}{\rotatebox{60}{gemma-3-27b-it}} \\
+      \midrule
+      MMLU & 0.6135 & 0.5005 & 0.5812 & 0.5633 & 0.6652 & 0.6846 & 0.6385 & 0.6287 & 0.6230 & 0.5942 & 0.5708 & 0.6440 \\
+      ARC Easy & 0.6734 & 0.4442 & 0.5779 & 0.6114 & 0.6820 & 0.6323 & 0.6830 & 0.8308 & 0.5910 & 0.5854 & 0.6081 & 0.7588 \\
+      ARC Challenge & 0.6333 & 0.6435 & 0.5659 & 0.5512 & 0.6690 & 0.6058 & 0.6303 & 0.7141 & 0.5827 & 0.5977 & 0.5756 & 0.6459 \\
+      SciQ & 0.6237 & 0.5277 & 0.5848 & 0.6313 & 0.6584 & 0.5779 & 0.6017 & 0.7498 & 0.6150 & 0.5003 & 0.5810 & 0.6968 \\
+      GPQA & 0.5094 & 0.4122 & 0.4837 & 0.4963 & 0.5495 & 0.6014 & 0.5661 & 0.6694 & 0.4988 & 0.5366 & 0.5291 & 0.5317 \\
+      GSM8K & 0.6352 & 0.6483 & 0.7330 & 0.7162 & 0.5887 & 0.5534 & 0.5204 & 0.6349 & 0.6161 & 0.6163 & 0.6036 & 0.6787 \\
+      SVamp & 0.6147 & 0.6179 & 0.8370 & 0.7968 & 0.7863 & 0.7862 & 0.7747 & 0.8250 & 0.7951 & 0.6392 & 0.7172 & 0.7178 \\
+      SciBench & 0.5797 & 0.5451 & 0.7839 & 0.7152 & 0.6379 & 0.6617 & 0.6214 & 0.6631 & 0.5976 & 0.5102 & 0.4619 & 0.6940 \\
+      \bottomrule
+    \end{tabular}%
+  }
+  \captionof{table}[AUROC by Model and Dataset for CCP]{AUROC by Model and Dataset for CCP}
+\end{center}

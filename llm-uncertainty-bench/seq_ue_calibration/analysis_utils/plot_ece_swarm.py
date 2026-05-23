@@ -143,7 +143,7 @@ def plot_ece_swarm(
         mpatches.Patch(color=color, label=m_type.capitalize())
         for m_type, color in _TYPE_COLORS.items()
     ]
-    ax.legend(handles=legend_handles, fontsize=10, loc="upper right")
+    ax.legend(handles=legend_handles, fontsize=10, loc="lower right")
 
     plt.tight_layout()
 

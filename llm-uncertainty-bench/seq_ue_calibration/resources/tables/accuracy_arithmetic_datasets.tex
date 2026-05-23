@@ -1,0 +1,23 @@
+\begin{table}[htbp]
+\centering
+\makebox[\textwidth][c]{%
+\begin{tabular}{llcccccccccccc}
+Dataset & Metric & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-20b}} & \parbox[t]{0mm}{\rotatebox{60}{gpt-oss-120b}} & \parbox[t]{0mm}{\rotatebox{60}{Ministral-8B-Instruct-2410}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Nemo-Instruct-2407}} & \parbox[t]{0mm}{\rotatebox{60}{Mistral-Small-3.2-24B-Instruct-2506}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-3.3-70B-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Llama-4-Scout-17B-16E-Instruct}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Instruct-2507}} & \parbox[t]{0mm}{\rotatebox{60}{Qwen3-30B-A3B-Thinking-2507}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Llama-70B}} & \parbox[t]{0mm}{\rotatebox{60}{DeepSeek-R1-Distill-Qwen-32B}} & \parbox[t]{0mm}{\rotatebox{60}{gemma-3-27b-it}} \\
+\hline
+\multirow{3}{*}{GSM8K} & Accuracy & 0.9444 & 0.9476 & 0.8944 & 0.8508 & 0.9544 & 0.9728 & 0.9660 & 0.9584 & 0.9096 & 0.9492 & 0.9328 & 0.9424 \\
+ & Accuracy across Questions & 0.8760 & 0.9280 & 0.6520 & 0.5560 & 0.9240 & 0.9600 & 0.9560 & 0.9440 & 0.7040 & 0.8280 & 0.8560 & 0.9080 \\
+ & Mean of Different Answers across Iterations & 1.1040 & 1.0520 & 1.5440 & 1.8480 & 1.0600 & 1.0200 & 1.0320 & 1.0400 & 1.0320 & 1.1840 & 1.1280 & 1.0760 \\
+\hline
+\multirow{3}{*}{SVamp} & Accuracy & 0.9544 & 0.9572 & 0.9108 & 0.8924 & 0.9364 & 0.9528 & 0.9396 & 0.9592 & 0.9432 & 0.8568 & 0.9396 & 0.9556 \\
+ & Accuracy across Questions & 0.9120 & 0.9280 & 0.7560 & 0.7000 & 0.8880 & 0.9240 & 0.9120 & 0.9360 & 0.8240 & 0.5600 & 0.8680 & 0.9320 \\
+ & Mean of Different Answers across Iterations & 1.0640 & 1.0640 & 1.3640 & 1.5000 & 1.1320 & 1.1040 & 1.1400 & 1.0240 & 1.0320 & 1.2800 & 1.1680 & 1.0640 \\
+\hline
+\multirow{3}{*}{SciBench} & Accuracy & 0.4060 & 0.4240 & 0.1780 & 0.1756 & 0.5172 & 0.4584 & 0.6056 & 0.6424 & 0.4156 & 0.3768 & 0.3800 & 0.5472 \\
+ & Accuracy across Questions & 0.2120 & 0.2440 & 0.0200 & 0.0120 & 0.2400 & 0.2360 & 0.4080 & 0.4920 & 0.2240 & 0.1320 & 0.1520 & 0.2920 \\
+ & Mean of Different Answers across Iterations & 3.0760 & 2.6480 & 6.6600 & 6.6560 & 3.1120 & 3.1000 & 2.0640 & 1.7680 & 1.4680 & 2.7680 & 2.7440 & 2.7480 \\
+\hline
+\end{tabular}
+}
+\caption[Accuracy, Consistency, and Answer Variability Across Arithmetic Datasets]{\textbf{Comparison of Accuracy, Question‐Level Consistency, and Answer Variability Across Arithmetic Datasets.} Metrics include base accuracy, the proportion of questions with all correct answers over ten runs, and the mean number of distinct answers produced across iterations for each model–dataset pair.}
+\label{tab:your_label}
+\end{table}
